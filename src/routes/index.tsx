@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
-import hero from "@/assets/hero.jpg";
+import priceMonitorVideo from "@/assets/videos/snitch-price-monitor-loop.mp4.asset.json";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -64,9 +64,14 @@ function Index() {
         </section>
 
         <section className="mx-auto max-w-5xl px-5">
-          <img
-            src={hero}
-            alt="A folded newspaper showing a market chart"
+          <video
+            src={priceMonitorVideo.url}
+            aria-label="Price Monitor sample showing seven-day prices for Aether Labs, Nexus Soft and Orbit AI"
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="auto"
             width={1600}
             height={912}
             className="w-full rounded-2xl"

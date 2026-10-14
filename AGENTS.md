@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Landing animation media is served through a Lovable Assets JSON pointer, not a committed video binary, to keep deployment assets lightweight.
