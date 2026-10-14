@@ -49,6 +49,7 @@ function AuthPage() {
   const [website, setWebsite] = useState(""); // honeypot: bots fill it, humans never see it
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => setMode(search.mode ?? "signin"), [search.mode]);
 
