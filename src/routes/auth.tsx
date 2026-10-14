@@ -203,6 +203,11 @@ function AuthPage() {
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
             />
+            {formError && (
+              <p role="alert" className="text-sm text-destructive">
+                {formError}
+              </p>
+            )}
             <Button type="submit" size="pill" className="w-full" disabled={busy}>
               {busy ? "Please wait" : mode === "signup" ? "Create account" : mode === "signin" ? "Sign in" : "Send link"}
             </Button>
