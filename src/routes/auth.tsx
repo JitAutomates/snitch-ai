@@ -51,7 +51,10 @@ function AuthPage() {
   const [sent, setSent] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  useEffect(() => setMode(search.mode ?? "signin"), [search.mode]);
+  useEffect(() => {
+    setMode(search.mode ?? "signin");
+    setFormError(null);
+  }, [search.mode]);
 
   // Signed-in users go straight to the dashboard.
   useEffect(() => {
