@@ -102,8 +102,14 @@ function AuthPage() {
         setSent("If an account exists, a reset link is on its way.");
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Something went wrong.";
-      toast.error(msg.includes("18 or older") ? "You must be 18 or older to use Snitch." : msg);
+      const raw = err instanceof Error ? err.message : "Something went wrong.";
+      const msg = raw.includes("18 or older")
+        ? "You must be 18 or older to use Snitch."
+        : /invalid login credentials/i.test(raw)
+          ? "Incorrect email or password. Please try again."
+          : raw;
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
