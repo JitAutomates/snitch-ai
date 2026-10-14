@@ -67,6 +67,7 @@ function AuthPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (website) return; // bot
+    setFormError(null);
     setBusy(true);
     try {
       if (mode === "signup") {
