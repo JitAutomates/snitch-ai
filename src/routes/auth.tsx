@@ -49,8 +49,12 @@ function AuthPage() {
   const [website, setWebsite] = useState(""); // honeypot: bots fill it, humans never see it
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  useEffect(() => setMode(search.mode ?? "signin"), [search.mode]);
+  useEffect(() => {
+    setMode(search.mode ?? "signin");
+    setFormError(null);
+  }, [search.mode]);
 
   // Signed-in users go straight to the dashboard.
   useEffect(() => {
@@ -66,6 +70,7 @@ function AuthPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (website) return; // bot
+    setFormError(null);
     setBusy(true);
     try {
       if (mode === "signup") {
@@ -100,8 +105,14 @@ function AuthPage() {
         setSent("If an account exists, a reset link is on its way.");
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Something went wrong.";
-      toast.error(msg.includes("18 or older") ? "You must be 18 or older to use Snitch." : msg);
+      const raw = err instanceof Error ? err.message : "Something went wrong.";
+      const msg = raw.includes("18 or older")
+        ? "You must be 18 or older to use Snitch."
+        : /invalid login credentials/i.test(raw)
+          ? "Incorrect email or password. Please try again."
+          : raw;
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -195,6 +206,11 @@ function AuthPage() {
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
             />
+            {formError && (
+              <p role="alert" className="text-sm text-destructive">
+                {formError}
+              </p>
+            )}
             <Button type="submit" size="pill" className="w-full" disabled={busy}>
               {busy ? "Please wait" : mode === "signup" ? "Create account" : mode === "signin" ? "Sign in" : "Send link"}
             </Button>
