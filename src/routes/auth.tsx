@@ -58,14 +58,24 @@ function AuthPage() {
 
   // Signed-in users go straight to the dashboard.
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) navigate({ to: "/dashboard", replace: true });
-    });
-    const { data } = supabase.auth.onAuthStateChange((e) => {
-      if (e === "SIGNED_IN") navigate({ to: "/dashboard", replace: true });
-    });
-    return () => data.subscription.unsubscribe();
-  }, [navigate]);
+  function goWhere(user: { user_metadata?: Record<string, unknown> } | null) {
+    if (!user) return;
+    // If the user has already answered the onboarding questions, go to dashboard
+    const meta = user.user_metadata ?? {};
+    const done = Boolean(meta.industry && meta.product && meta.region && meta.scale);
+    navigate({ to: done ? "/dashboard" : "/onboarding", replace: true });
+  }
+
+  supabase.auth.getUser().then(({ data }) => {
+    goWhere(data.user);
+  });
+
+  const { data } = supabase.auth.onAuthStateChange((e, session) => {
+    if (e === "SIGNED_IN") goWhere(session?.user ?? null);
+  });
+
+  return () => data.subscription.unsubscribe();
+}, [navigate]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
