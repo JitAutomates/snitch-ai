@@ -28,7 +28,7 @@ export const Route = createFileRoute("/_authenticated/onboarding")({
   component: OnboardingPage,
 });
 
-const STEPS = ["industry", "product", "region", "scale"] as const;
+const STEPS = ["industry", "product", "region", "scale", "sales"] as const;
 type Step = (typeof STEPS)[number];
 
 const SCALE_OPTIONS = [
@@ -37,6 +37,7 @@ const SCALE_OPTIONS = [
   { value: "large", label: "Large team (12+ members)" },
 ] as const;
 
+const [salesVolume, setSalesVolume] = useState("");
 const COUNTRIES = [
   "Afghanistan","Albania","Algeria","Andorra","Angola","Argentina","Armenia","Australia",
   "Austria","Azerbaijan","Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium",
@@ -82,6 +83,10 @@ function OnboardingPage() {
     if (step === "product") return product.trim().length > 0;
     if (step === "region") return region.length > 0;
     if (step === "scale") return scale.length > 0;
+    if (step == "sales") {
+      const n = Number(salesVolume);
+      return Number.isFinite(n) && n > 0;
+    }
     return false;
   }
 
@@ -94,6 +99,7 @@ function OnboardingPage() {
           product: product.trim().slice(0, 200),
           region,
           scale,
+          sales_volume: Number(Number(salesVolume).toPrecision(2)),
         },
       });
       if (error) throw error;
@@ -122,6 +128,7 @@ function OnboardingPage() {
     product: "What is your main product or service?",
     region: "Where is your company based?",
     scale: "How large is your team?",
+    sales: "Rough annual sales volume (HKD)? We only need this info to 2 significant figures, and you can always change your input if your business grows!"
   };
 
   return (
@@ -202,6 +209,24 @@ function OnboardingPage() {
                   </button>
                 ))}
               </div>
+                        {step === "sales" && (
+            <div className="space-y-2">
+              <Label htmlFor="sales">Annual sales volume (HKD)</Label>
+              <Input
+                id="sales"
+                type="number"
+                inputMode="decimal"
+                value={salesVolume}
+                onChange={(e) => setSalesVolume(e.target.value)}
+                placeholder="e.g. 1200000"
+                autoFocus
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Two significant figures is enough. We match competitors within ±50% of this band for pricing charts.
+              </p>
+            </div>
+          )}
             </div>
           )}
 
