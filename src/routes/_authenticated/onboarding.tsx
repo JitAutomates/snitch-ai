@@ -230,8 +230,6 @@ function OnboardingPage() {
               </p>
             </div>
           )}
-            </div>
-          )}
 
           <div className="flex gap-3">
             {stepIndex > 0 && (
