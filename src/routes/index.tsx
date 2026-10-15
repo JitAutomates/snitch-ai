@@ -7,16 +7,15 @@ import priceMonitorWebm from "@/assets/videos/snitch-price-monitor-loop.webm.ass
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Snitch: Competitor, price and news briefs for startups" },
+      { title: "Snitch: Weekly competitor intel for Hong Kong startup founders" },
       {
         name: "description",
         content:
-          "Snitch watches your competitors, their prices and your niche news, then sends you one clear weekly brief.",
-      },
+          "Built for HK founders. Track peer pricing, niche news, and competitor moves in one brief."
       { property: "og:title", content: "Snitch: Intelligence briefs for startups" },
       {
         property: "og:description",
-        content: "Competitor, price and niche news monitoring in one weekly brief. Free to start.",
+        content: "Competitor, price and niche news monitoring in one brief.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -28,15 +27,15 @@ export const Route = createFileRoute("/")({
 const features = [
   {
     title: "News Monitor",
-    body: "Your niche, written up like a morning paper. Only the stories that matter to your market.",
+    body: "Local and regional stories on your market, written like morning paper",
   },
   {
     title: "Price Monitor",
-    body: "Track what similar products cost across your industry, on one simple line chart.",
+    body: "Peer pricing within range of your business scale, with clear history and direction.",
   },
   {
     title: "Competitor Monitor",
-    body: "See who leads your space and a short summary of the moves that got them there.",
+    body: "See why others are ahead of you, and how.",
   },
 ];
 
@@ -47,10 +46,10 @@ function Index() {
       <main>
         <section className="mx-auto max-w-4xl px-5 pt-20 pb-12 text-center">
           <h1 className="text-5xl leading-tight tracking-tight md:text-7xl">
-            Know what your competitors did this week.
+            Built for HK startup founders.
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-lg text-muted-foreground md:text-xl">
-            Snitch monitors competitors, prices and niche news, then delivers one clear weekly brief.
+            Snitch watches competitors, prices and niche news that matters in HK, then delivers clear briefs.
           </p>
           <div className="mt-10 flex flex-col items-center gap-3">
             <Button asChild size="pill">
