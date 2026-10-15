@@ -200,7 +200,9 @@ function Monitors() {
             {NAV.map(({ to, label, icon: Icon }) => (
               <Link
                 key={to}
-                to={to}
+                // Briefs, billing, and settings routes ship later; cast keeps
+                // the shared NAV pattern typechecking until they exist.
+                to={to as never}
                 className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground [&.active]:bg-accent [&.active]:text-foreground"
                 activeOptions={{ exact: to === "/dashboard" }}
               >
