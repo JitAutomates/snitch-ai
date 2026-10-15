@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import priceMonitorVideo from "@/assets/videos/snitch-price-monitor-loop.mp4.asset.json";
+import priceMonitorWebm from "@/assets/videos/snitch-price-monitor-loop.webm.asset.json";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -65,7 +66,6 @@ function Index() {
 
         <section className="mx-auto max-w-5xl px-5">
           <video
-            src={priceMonitorVideo.url}
             aria-label="Price Monitor sample showing seven-day prices for Aether Labs, Nexus Soft and Orbit AI"
             autoPlay
             loop
@@ -75,7 +75,10 @@ function Index() {
             width={1600}
             height={912}
             className="w-full rounded-2xl"
-          />
+          >
+            <source src={priceMonitorVideo.url} type="video/mp4" />
+            <source src={priceMonitorWebm.url} type="video/webm" />
+          </video>
         </section>
 
         <section className="mx-auto grid max-w-5xl gap-4 px-5 py-20 md:grid-cols-3">
