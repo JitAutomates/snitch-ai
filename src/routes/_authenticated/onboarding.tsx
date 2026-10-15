@@ -37,7 +37,6 @@ const SCALE_OPTIONS = [
   { value: "large", label: "Large team (12+ members)" },
 ] as const;
 
-const [salesVolume, setSalesVolume] = useState("");
 const COUNTRIES = [
   "Afghanistan","Albania","Algeria","Andorra","Angola","Argentina","Armenia","Australia",
   "Austria","Azerbaijan","Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium",
@@ -73,6 +72,7 @@ function OnboardingPage() {
   const [product, setProduct] = useState("");
   const [region, setRegion] = useState("");
   const [scale, setScale] = useState("");
+  const [salesVolume, setSalesVolume] = useState("");
   const [busy, setBusy] = useState(false);
 
   const step: Step = STEPS[stepIndex];
@@ -190,7 +190,7 @@ function OnboardingPage() {
             </div>
           )}
 
-          {step === "scale" && (
+                    {step === "scale" && (
             <div className="space-y-2">
               <Label>Company scale</Label>
               <div className="space-y-2">
@@ -209,7 +209,10 @@ function OnboardingPage() {
                   </button>
                 ))}
               </div>
-                        {step === "sales" && (
+            </div>
+          )}
+
+          {step === "sales" && (
             <div className="space-y-2">
               <Label htmlFor="sales">Annual sales volume (HKD)</Label>
               <Input
