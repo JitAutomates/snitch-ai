@@ -11,7 +11,8 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Built for HK founders. Track peer pricing, niche news, and competitor moves in one brief."
+          "Built for HK founders. Track peer pricing, niche news, and competitor moves in one brief.",
+      },
       { property: "og:title", content: "Snitch: Intelligence briefs for startups" },
       {
         property: "og:description",
