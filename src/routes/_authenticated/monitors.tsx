@@ -93,7 +93,7 @@ function buildNewsArchive(): { dateLabel: string; dateKey: string; articles: New
       day: "numeric",
     });
     const articles = [0, 1, 2].map((j) => {
-      const s = seeds[(i + j) % seeds.length];
+      const s = seeds[(i + j) % seeds.length]!;
       return {
         ...s,
         headline: i === 0 ? s.headline : `${s.headline} (${i}d archive)`,
@@ -167,7 +167,7 @@ function Monitors() {
   const [dayOffset, setDayOffset] = useState(0); // 0 = today, 49 = 49 days ago
   const [alertIndex, setAlertIndex] = useState(0);
 
-  const issue = NEWS_ARCHIVE[dayOffset];
+  const issue = NEWS_ARCHIVE[dayOffset]!;
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -183,7 +183,7 @@ function Monitors() {
     navigate({ to: "/auth", replace: true });
   }
 
-  const activeAlert = COMPETITOR_ALERTS[alertIndex];
+  const activeAlert = COMPETITOR_ALERTS[alertIndex]!;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -284,11 +284,11 @@ function Monitors() {
               <article
                 className="rounded-sm border border-neutral-700 bg-[#111] px-6 py-8 shadow-inner md:px-10"
                 onTouchStart={(e) => {
-                  (e.currentTarget as HTMLElement).dataset.tx = String(e.touches[0].clientX);
+                  (e.currentTarget as HTMLElement).dataset["tx"] = String(e.touches[0]!.clientX);
                 }}
                 onTouchEnd={(e) => {
-                  const start = Number((e.currentTarget as HTMLElement).dataset.tx ?? 0);
-                  const end = e.changedTouches[0].clientX;
+                  const start = Number((e.currentTarget as HTMLElement).dataset["tx"] ?? 0);
+                  const end = e.changedTouches[0]!.clientX;
                   const dx = end - start;
                   if (dx < -40) setDayOffset((d) => Math.min(49, d + 1)); // swipe left → older
                   if (dx > 40) setDayOffset((d) => Math.max(0, d - 1));

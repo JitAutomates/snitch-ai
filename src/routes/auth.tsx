@@ -62,7 +62,7 @@ function AuthPage() {
     if (!user) return;
     // If the user has already answered the onboarding questions, go to dashboard
     const meta = user.user_metadata ?? {};
-    const done = Boolean(meta.industry && meta.product && meta.region && meta.scale);
+    const done = Boolean(meta["industry"] && meta["product"] && meta["region"] && meta["scale"]);
     navigate({ to: done ? "/dashboard" : "/onboarding", replace: true });
   }
 

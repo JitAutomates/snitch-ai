@@ -75,7 +75,7 @@ function OnboardingPage() {
   const [salesVolume, setSalesVolume] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const step: Step = STEPS[stepIndex];
+  const step: Step = STEPS[stepIndex]!;
   const isLast = stepIndex === STEPS.length - 1;
 
   function canContinue(): boolean {
