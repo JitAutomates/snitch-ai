@@ -167,7 +167,7 @@ function Monitors() {
   const [dayOffset, setDayOffset] = useState(0); // 0 = today, 49 = 49 days ago
   const [alertIndex, setAlertIndex] = useState(0);
 
-  const issue = NEWS_ARCHIVE[dayOffset];
+  const issue = NEWS_ARCHIVE[dayOffset]!;
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -183,7 +183,7 @@ function Monitors() {
     navigate({ to: "/auth", replace: true });
   }
 
-  const activeAlert = COMPETITOR_ALERTS[alertIndex];
+  const activeAlert = COMPETITOR_ALERTS[alertIndex]!;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
