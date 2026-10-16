@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as AuthenticatedCompetitorMonitorRouteImport } from './routes/_authenticated/competitor-monitor'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedMonitorsRouteImport } from './routes/_authenticated/monitors'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
@@ -36,6 +37,12 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
   path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedCompetitorMonitorRoute =
+  AuthenticatedCompetitorMonitorRouteImport.update({
+    id: '/competitor-monitor',
+    path: '/competitor-monitor',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -56,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/competitor-monitor': typeof AuthenticatedCompetitorMonitorRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/monitors': typeof AuthenticatedMonitorsRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
@@ -64,6 +72,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/competitor-monitor': typeof AuthenticatedCompetitorMonitorRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/monitors': typeof AuthenticatedMonitorsRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
@@ -74,6 +83,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/_authenticated/competitor-monitor': typeof AuthenticatedCompetitorMonitorRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/monitors': typeof AuthenticatedMonitorsRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
@@ -84,6 +94,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/reset-password'
+    | '/competitor-monitor'
     | '/dashboard'
     | '/monitors'
     | '/onboarding'
@@ -92,6 +103,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/reset-password'
+    | '/competitor-monitor'
     | '/dashboard'
     | '/monitors'
     | '/onboarding'
@@ -101,6 +113,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/reset-password'
+    | '/_authenticated/competitor-monitor'
     | '/_authenticated/dashboard'
     | '/_authenticated/monitors'
     | '/_authenticated/onboarding'
@@ -143,6 +156,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/competitor-monitor': {
+      id: '/_authenticated/competitor-monitor'
+      path: '/competitor-monitor'
+      fullPath: '/competitor-monitor'
+      preLoaderRoute: typeof AuthenticatedCompetitorMonitorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -168,12 +188,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedCompetitorMonitorRoute: typeof AuthenticatedCompetitorMonitorRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedMonitorsRoute: typeof AuthenticatedMonitorsRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedCompetitorMonitorRoute: AuthenticatedCompetitorMonitorRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedMonitorsRoute: AuthenticatedMonitorsRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
