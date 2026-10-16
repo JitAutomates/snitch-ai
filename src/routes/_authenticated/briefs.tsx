@@ -85,7 +85,7 @@ function Briefs() {
   const todayKey = dayKey(new Date());
   const [history, setHistory] = useState<Brief[]>(INITIAL_HISTORY);
   const [loading, setLoading] = useState(false);
-  const [selected, setSelected] = useState<string | null>(INITIAL_HISTORY[0].date);
+  const [selected, setSelected] = useState<string | null>(INITIAL_HISTORY[0]!.date);
   const today = history.find((b) => b.date === todayKey);
 
   async function signOut() {

@@ -93,7 +93,7 @@ function buildNewsArchive(): { dateLabel: string; dateKey: string; articles: New
       day: "numeric",
     });
     const articles = [0, 1, 2].map((j) => {
-      const s = seeds[(i + j) % seeds.length];
+      const s = seeds[(i + j) % seeds.length]!;
       return {
         ...s,
         headline: i === 0 ? s.headline : `${s.headline} (${i}d archive)`,
@@ -284,11 +284,11 @@ function Monitors() {
               <article
                 className="rounded-sm border border-neutral-700 bg-[#111] px-6 py-8 shadow-inner md:px-10"
                 onTouchStart={(e) => {
-                  (e.currentTarget as HTMLElement).dataset.tx = String(e.touches[0].clientX);
+                  (e.currentTarget as HTMLElement).dataset["tx"] = String(e.touches[0]!.clientX);
                 }}
                 onTouchEnd={(e) => {
-                  const start = Number((e.currentTarget as HTMLElement).dataset.tx ?? 0);
-                  const end = e.changedTouches[0].clientX;
+                  const start = Number((e.currentTarget as HTMLElement).dataset["tx"] ?? 0);
+                  const end = e.changedTouches[0]!.clientX;
                   const dx = end - start;
                   if (dx < -40) setDayOffset((d) => Math.min(49, d + 1)); // swipe left → older
                   if (dx > 40) setDayOffset((d) => Math.max(0, d - 1));
