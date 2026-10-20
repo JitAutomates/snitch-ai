@@ -13,11 +13,13 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as AuthenticatedBillingRouteImport } from './routes/_authenticated/billing'
 import { Route as AuthenticatedBriefsRouteImport } from './routes/_authenticated/briefs'
 import { Route as AuthenticatedCompetitorMonitorRouteImport } from './routes/_authenticated/competitor-monitor'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedMonitorsRouteImport } from './routes/_authenticated/monitors'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedPaymentRouteImport } from './routes/_authenticated/payment'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -37,6 +39,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedBillingRoute = AuthenticatedBillingRouteImport.update({
+  id: '/billing',
+  path: '/billing',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedBriefsRoute = AuthenticatedBriefsRouteImport.update({
   id: '/briefs',
@@ -64,26 +71,35 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPaymentRoute = AuthenticatedPaymentRouteImport.update({
+  id: '/payment',
+  path: '/payment',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/billing': typeof AuthenticatedBillingRoute
   '/briefs': typeof AuthenticatedBriefsRoute
   '/competitor-monitor': typeof AuthenticatedCompetitorMonitorRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/monitors': typeof AuthenticatedMonitorsRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/payment': typeof AuthenticatedPaymentRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/billing': typeof AuthenticatedBillingRoute
   '/briefs': typeof AuthenticatedBriefsRoute
   '/competitor-monitor': typeof AuthenticatedCompetitorMonitorRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/monitors': typeof AuthenticatedMonitorsRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/payment': typeof AuthenticatedPaymentRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -91,11 +107,13 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/_authenticated/billing': typeof AuthenticatedBillingRoute
   '/_authenticated/briefs': typeof AuthenticatedBriefsRoute
   '/_authenticated/competitor-monitor': typeof AuthenticatedCompetitorMonitorRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/monitors': typeof AuthenticatedMonitorsRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
+  '/_authenticated/payment': typeof AuthenticatedPaymentRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -103,32 +121,38 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/reset-password'
+    | '/billing'
     | '/briefs'
     | '/competitor-monitor'
     | '/dashboard'
     | '/monitors'
     | '/onboarding'
+    | '/payment'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
     | '/reset-password'
+    | '/billing'
     | '/briefs'
     | '/competitor-monitor'
     | '/dashboard'
     | '/monitors'
     | '/onboarding'
+    | '/payment'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
     | '/reset-password'
+    | '/_authenticated/billing'
     | '/_authenticated/briefs'
     | '/_authenticated/competitor-monitor'
     | '/_authenticated/dashboard'
     | '/_authenticated/monitors'
     | '/_authenticated/onboarding'
+    | '/_authenticated/payment'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -168,6 +192,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/billing': {
+      id: '/_authenticated/billing'
+      path: '/billing'
+      fullPath: '/billing'
+      preLoaderRoute: typeof AuthenticatedBillingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/briefs': {
       id: '/_authenticated/briefs'
       path: '/briefs'
@@ -203,23 +234,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/payment': {
+      id: '/_authenticated/payment'
+      path: '/payment'
+      fullPath: '/payment'
+      preLoaderRoute: typeof AuthenticatedPaymentRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedBillingRoute: typeof AuthenticatedBillingRoute
   AuthenticatedBriefsRoute: typeof AuthenticatedBriefsRoute
   AuthenticatedCompetitorMonitorRoute: typeof AuthenticatedCompetitorMonitorRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedMonitorsRoute: typeof AuthenticatedMonitorsRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
+  AuthenticatedPaymentRoute: typeof AuthenticatedPaymentRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedBillingRoute: AuthenticatedBillingRoute,
   AuthenticatedBriefsRoute: AuthenticatedBriefsRoute,
   AuthenticatedCompetitorMonitorRoute: AuthenticatedCompetitorMonitorRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedMonitorsRoute: AuthenticatedMonitorsRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
+  AuthenticatedPaymentRoute: AuthenticatedPaymentRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
