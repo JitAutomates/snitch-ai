@@ -90,19 +90,7 @@ function OnboardingPage() {
     return false;
   }
 
-  async function finish(
-    const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData.session?.access_token;
-    if (accessToken) {
-        void fetch("/api/peers/resolve", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({ reason: "onboarding" }),
-  });
-}) {
+    async function finish() {
     setBusy(true);
     try {
       const { error } = await supabase.auth.updateUser({
@@ -115,6 +103,20 @@ function OnboardingPage() {
         },
       });
       if (error) throw error;
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (accessToken) {
+        void fetch("/api/peers/resolve", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ reason: "onboarding" }),
+        });
+      }
+
       toast.success("Profile saved.");
       navigate({ to: "/dashboard", replace: true });
     } catch (err) {
@@ -124,17 +126,7 @@ function OnboardingPage() {
       setBusy(false);
     }
   }
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!canContinue()) return;
-    if (isLast) {
-      void finish();
-    } else {
-      setStepIndex((i) => i + 1);
-    }
-  }
-
+  
   const titles: Record<Step, string> = {
     industry: "What industry are you in?",
     product: "What is your main product or service?",
