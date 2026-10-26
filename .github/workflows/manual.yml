@@ -30,7 +30,7 @@ jobs:
       - name: Call peer resolve (monthly)
         env:
           APP_URL: ${{ secrets.SNITCH_APP_URL }}
-          CRON_SECRET: ${{ secrets.LOVABLE_CRON_SECRET }}
+          CRON_SECRET: ${{ secrets.PEER_MONTHLY_CRON_SECRET }}
         run: |
           set -euo pipefail
 
@@ -39,7 +39,7 @@ jobs:
             exit 1
           fi
           if [ -z "${CRON_SECRET:-}" ]; then
-            echo "Missing secret LOVABLE_CRON_SECRET"
+            echo "Missing secret PEER_MONTHLY_CRON_SECRET"
             exit 1
           fi
 
