@@ -18,14 +18,17 @@ export async function POST(request: Request) {
   }
 
   // --- Path A: monthly cron (no user JWT) ---
-  if (body.reason === "monthly") {
-    const denied = await authenticateCronRequest(request);
-    if (denied) return denied;
+    if (body.reason === "monthly") {
+    const authHeader = request.headers.get("authorization") ?? "";
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+    const monthlySecret = process.env.PEER_MONTHLY_CRON_SECRET ?? "";
 
-    const db = createClient(
-      process.env['SUPABASE_URL']!,
-      process.env['SUPABASE_SERVICE_ROLE_KEY']!,
-    );
+    const lovableDenied = await authenticateCronRequest(request);
+    const monthlyOk = Boolean(monthlySecret && token && token === monthlySecret);
+
+    if (lovableDenied && !monthlyOk) {
+      return lovableDenied;
+    }
 
     // Users whose peers are older than ~30 days
     const cutoff = new Date();
