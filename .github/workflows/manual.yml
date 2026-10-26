@@ -1,0 +1,66 @@
+# Monthly peer refresh for Snitch
+# Calls POST /api/peers/resolve with reason=monthly (cron secret only).
+#
+# Required GitHub repo secrets (Settings → Secrets and variables → Actions):
+#   SNITCH_APP_URL          e.g. https://snitchai.org  (no trailing slash)
+#   LOVABLE_CRON_SECRET     same value as Lovable secret LOVABLE_CRON_SECRET
+
+name: Monthly peer resolve
+
+on:
+  schedule:
+    # 03:00 UTC on the 1st of every month
+    # ≈ 11:00 HKT (UTC+8). Change if you want a different hour.
+    - cron: "0 3 1 * *"
+  workflow_dispatch:
+    inputs:
+      dry_note:
+        description: "Optional note (not sent to the API)"
+        required: false
+        default: "manual run"
+
+permissions:
+  contents: read
+
+jobs:
+  resolve-peers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Call peer resolve (monthly)
+        env:
+          APP_URL: ${{ secrets.SNITCH_APP_URL }}
+          CRON_SECRET: ${{ secrets.LOVABLE_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${APP_URL:-}" ]; then
+            echo "Missing secret SNITCH_APP_URL"
+            exit 1
+          fi
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "Missing secret LOVABLE_CRON_SECRET"
+            exit 1
+          fi
+
+          # strip trailing slash
+          BASE="${APP_URL%/}"
+          URL="${BASE}/api/peers/resolve"
+
+          echo "POST ${URL}"
+          HTTP_CODE=$(curl -sS -o /tmp/peer-resolve-body.json -w "%{http_code}" \
+            -X POST "${URL}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -d '{"reason":"monthly"}')
+
+          echo "HTTP ${HTTP_CODE}"
+          cat /tmp/peer-resolve-body.json || true
+          echo
+
+          if [ "${HTTP_CODE}" -lt 200 ] || [ "${HTTP_CODE}" -ge 300 ]; then
+            echo "Peer resolve failed"
+            exit 1
+          fi
+
+          echo "Peer resolve OK"
