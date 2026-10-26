@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { COUNTRIES } from "@/lib/settings-countries";
-import { APPEARANCE_KEY, DEFAULT_APPEARANCE, applyAppearance, loadAppearance, peerFieldsChanged, profileFromMetadata, type Appearance, type ProfileFields } from "@/lib/settings";
+import { APPEARANCE_KEY, DEFAULT_APPEARANCE, applyAppearance, canConfirmAccountAction, loadAppearance, peerFieldsChanged, profileFromMetadata, type Appearance, type ProfileFields } from "@/lib/settings";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [
@@ -178,7 +178,7 @@ function SettingsPage() {
           </div>
         </main>
       </div>
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}><DialogContent><DialogHeader><DialogTitle>Delete account</DialogTitle><DialogDescription>Full account deletion requires server-side support and is not available yet. Continuing clears local preferences and signs you out only. Your account and associated Snitch data will remain.</DialogDescription></DialogHeader><div className="space-y-2"><Label htmlFor="delete-confirmation">Type DELETE to confirm</Label><Input id="delete-confirmation" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} autoComplete="off" /></div><DialogFooter><Button variant="secondary" onClick={() => setDeleteOpen(false)}>Cancel</Button><Button variant="destructive" disabled={confirmation !== "DELETE" || signingOut} onClick={() => { if (confirmation === "DELETE") void signOut(true); }}>Clear preferences &amp; sign out</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}><DialogContent><DialogHeader><DialogTitle>Delete account</DialogTitle><DialogDescription>Full account deletion requires server-side support and is not available yet. Continuing clears local preferences and signs you out only. Your account and associated Snitch data will remain.</DialogDescription></DialogHeader><div className="space-y-2"><Label htmlFor="delete-confirmation">Type DELETE to confirm</Label><Input id="delete-confirmation" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} autoComplete="off" /></div><DialogFooter><Button variant="secondary" onClick={() => setDeleteOpen(false)}>Cancel</Button><Button variant="destructive" disabled={!canConfirmAccountAction(confirmation) || signingOut} onClick={() => { if (canConfirmAccountAction(confirmation)) void signOut(true); }}>Clear preferences &amp; sign out</Button></DialogFooter></DialogContent></Dialog>
     </div>
   );
 }

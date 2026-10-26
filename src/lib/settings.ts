@@ -25,6 +25,7 @@ export function profileFromMetadata(metadata: Record<string, unknown>): ProfileF
 }
 
 export const APPEARANCE_KEY = "snitch_appearance";
+export function canConfirmAccountAction(value: string) { return value === "DELETE"; }
 export type Appearance = { theme: "dark" | "light"; fontSize: "small" | "medium" | "large"; colouredEmphasis: boolean };
 export const DEFAULT_APPEARANCE: Appearance = { theme: "dark", fontSize: "medium", colouredEmphasis: false };
 
