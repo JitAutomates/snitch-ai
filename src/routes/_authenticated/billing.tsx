@@ -24,6 +24,7 @@ export const Route = createFileRoute("/_authenticated/billing")({
         content: "Free and Premium plans for Hong Kong startup founders.",
       },
       { property: "og:title", content: "Billing | Snitch" },
+      { property: "og:description", content: "Free and Premium plans for Hong Kong startup founders." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

@@ -23,8 +23,8 @@ export type ResolvedPeer = {
 };
 
 function adminDb() {
-  const url = process.env.SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const url = process.env['SUPABASE_URL']!;
+  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']!;
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
@@ -33,7 +33,7 @@ export async function resolvePeersWithExa(
   userId: string,
   profile: PeerProfile,
 ): Promise<{ peers: ResolvedPeer[]; query: string }> {
-  const apiKey = process.env.EXA_API_KEY;
+  const apiKey = process.env['EXA_API_KEY'];
   if (!apiKey) throw new Error("EXA_API_KEY is not configured");
 
   const query = buildPeerResolverQuery(profile);
