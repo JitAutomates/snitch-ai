@@ -23,8 +23,8 @@ export async function POST(request: Request) {
     if (denied) return denied;
 
     const db = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      process.env['SUPABASE_URL']!,
+      process.env['SUPABASE_SERVICE_ROLE_KEY']!,
     );
 
     // Users whose peers are older than ~30 days
@@ -67,8 +67,8 @@ export async function POST(request: Request) {
   }
 
   const userClient = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_ANON_KEY!,
+    process.env['SUPABASE_URL']!,
+    process.env['SUPABASE_ANON_KEY']!,
     { global: { headers: { Authorization: `Bearer ${token}` } } },
   );
 
@@ -78,11 +78,11 @@ export async function POST(request: Request) {
   }
 
   const meta = userData.user.user_metadata ?? {};
-  const industry = String(meta.industry ?? "");
-  const product = String(meta.product ?? "");
-  const region = String(meta.region ?? "");
-  const scale = String(meta.scale ?? "");
-  const sales = String(meta.sales_volume ?? "");
+  const industry = String(meta['industry'] ?? "");
+  const product = String(meta['product'] ?? "");
+  const region = String(meta['region'] ?? "");
+  const scale = String(meta['scale'] ?? "");
+  const sales = String(meta['sales_volume'] ?? "");
 
   if (!industry || !product || !region || !scale || !sales) {
     return Response.json(

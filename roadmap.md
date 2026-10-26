@@ -1,4 +1,7 @@
 # Current task
+- [x] Add Settings profile, subscription, appearance, and account controls.
+- [x] Test peer refresh conditions, appearance rules, DELETE confirmation, and signed-out protection.
+- [ ] Verify signed-in profile persistence and Settings interactions. Blocked: Lovable Cloud account-session minting reports database unavailable.
 - [x] Create and review the seamless 10-second price widget video.
 - [x] Replace only landing media, preserving size and position.
 - [x] Verify playback and unchanged page layout.

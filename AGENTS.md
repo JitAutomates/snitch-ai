@@ -10,3 +10,4 @@
 <!-- LOVABLE:END -->
 
 - Landing animation media is served through a Lovable Assets JSON pointer, not a committed video binary, to keep deployment assets lightweight.
+- Settings business-field comparisons and appearance persistence live in a browser-safe utility; the root applies saved preferences after hydration so navigation retains them without a theme-provider refactor.

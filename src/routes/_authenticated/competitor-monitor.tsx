@@ -16,6 +16,10 @@ export const Route = createFileRoute("/_authenticated/competitor-monitor")({
     meta: [
       { title: "Competitor monitor | Snitch" },
       { name: "description", content: "AI summaries of significant competitor events." },
+      { property: "og:title", content: "Competitor monitor | Snitch" },
+      { property: "og:description", content: "AI summaries of significant competitor events." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex" },
     ],
   }),

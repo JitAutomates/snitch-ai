@@ -4,6 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/payment")({
+  head: () => ({ meta: [
+    { title: "Payment | Snitch" },
+    { name: "description", content: "Preview your Snitch Premium plan activation." },
+    { property: "og:title", content: "Payment | Snitch" },
+    { property: "og:description", content: "Preview your Snitch Premium plan activation." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: PaymentPage,
 });
 
