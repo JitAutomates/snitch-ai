@@ -90,7 +90,19 @@ function OnboardingPage() {
     return false;
   }
 
-  async function finish() {
+  async function finish(
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (accessToken) {
+        void fetch("/api/peers/resolve", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ reason: "onboarding" }),
+  });
+}) {
     setBusy(true);
     try {
       const { error } = await supabase.auth.updateUser({
