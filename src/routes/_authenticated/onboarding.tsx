@@ -126,6 +126,16 @@ function OnboardingPage() {
       setBusy(false);
     }
   }
+
+    function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!canContinue()) return;
+    if (isLast) {
+      void finish();
+    } else {
+      setStepIndex((i) => i + 1);
+    }
+  }
   
   const titles: Record<Step, string> = {
     industry: "What industry are you in?",
