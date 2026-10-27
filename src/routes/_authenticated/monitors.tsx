@@ -237,28 +237,50 @@ function Monitors() {
 
             {/* Competitor alerts carousel */}
             <section>
-              <h2 className="mb-3 text-lg tracking-tight">Competitor alerts</h2>
-              <button
-                type="button"
-                onClick={() => navigate({ to: "/competitor-monitor" as never })}
-                className="w-full rounded-2xl border border-amber-500/30 bg-card p-5 text-left transition-colors hover:border-amber-500/50"
-              >
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <h3 className="text-base">{activeAlert.title}</h3>
-                      <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                        {activeAlert.severity}
-                      </span>
+              <h2 className="mb-3 text-lg tracking-tight">Competitor peers</h2>
+              {peersLoading ? (
+                <p className="rounded-2xl border border-border/60 bg-card p-5 text-sm text-muted-foreground">
+                  Loading peers…
+                </p>
+              ) : peersError ? (
+                <p className="rounded-2xl border border-border/60 bg-card p-5 text-sm text-destructive">
+                  Could not load peers: {peersError}
+                </p>
+              ) : !activePeer ? (
+                <p className="rounded-2xl border border-border/60 bg-card p-5 text-sm text-muted-foreground">
+                  No peers yet. Finish onboarding so Exa can resolve up to 10 competitors.
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate({ to: "/competitor-monitor" as never })}
+                  className="w-full rounded-2xl border border-amber-500/30 bg-card p-5 text-left transition-colors hover:border-amber-500/50"
+                >
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <h3 className="text-base">{activePeer.name}</h3>
+                        <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                          #{activePeer.rank ?? alertIndex + 1}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {[activePeer.scale, activePeer.sales_estimate]
+                          .filter(Boolean)
+                          .join(" · ") || "Peer in your band"}
+                        {activePeer.company_url ? ` · ${activePeer.company_url}` : ""}
+                      </p>
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        Tap for detail · {alertIndex + 1}/{peers.length}
+                        {activePeer.resolved_at
+                          ? ` · resolved ${new Date(activePeer.resolved_at).toLocaleDateString("en-HK")}`
+                          : ""}
+                      </p>
                     </div>
-                    <p className="mt-2 text-sm text-muted-foreground">{activeAlert.detail}</p>
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      Tap for full summary · {alertIndex + 1}/{COMPETITOR_ALERTS.length}
-                    </p>
                   </div>
-                </div>
-              </button>
+                </button>
+              )}
             </section>
 
             {/* Newspaper niche news */}
