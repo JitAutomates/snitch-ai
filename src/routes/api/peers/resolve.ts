@@ -5,7 +5,7 @@ import { resolvePeersWithExa } from "@/server/peers/resolve-peers";
 
 const ALLOWED = new Set(["onboarding", "profile_change", "monthly"]);
 
-async function handlePost(request: Request) {
+async function handlePost({ request }: { request: Request }) {
   const body = (await request.json().catch(() => ({}))) as {
     reason?: string;
     userId?: string;
@@ -22,7 +22,7 @@ async function handlePost(request: Request) {
   if (body.reason === "monthly") {
     const authHeader = request.headers.get("authorization") ?? "";
     const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-    const monthlySecret = process.env.PEER_MONTHLY_CRON_SECRET ?? "";
+    const monthlySecret = process.env['PEER_MONTHLY_CRON_SECRET'] ?? "";
 
     const lovableDenied = await authenticateCronRequest(request);
     const monthlyOk = Boolean(monthlySecret && token && token === monthlySecret);
@@ -33,8 +33,8 @@ async function handlePost(request: Request) {
 
     // Admin client: bypasses RLS for the cross-user monthly sweep.
     const db = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      process.env['SUPABASE_URL']!,
+      process.env['SUPABASE_SERVICE_ROLE_KEY']!,
       { auth: { persistSession: false, autoRefreshToken: false, storage: undefined } },
     );
 
@@ -116,7 +116,7 @@ async function handlePost(request: Request) {
 export const Route = createFileRoute("/api/peers/resolve")({
   server: {
     handlers: {
-      POST: handlePost,
+      POST: ({ request }) => handlePost(request),
     },
   },
 });
