@@ -116,7 +116,7 @@ async function handlePost({ request }: { request: Request }) {
 export const Route = createFileRoute("/api/peers/resolve")({
   server: {
     handlers: {
-      POST: ({ request }) => handlePost(request),
+      POST: ({ request }) => handlePost({ request }),
     },
   },
 });
