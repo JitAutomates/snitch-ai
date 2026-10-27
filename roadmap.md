@@ -1,4 +1,6 @@
 # Current task
+- [ ] Enforce exclusive Exa resolver path, JWT/cron authentication, and server-only secrets.
+- [ ] Add call-path guard and security regression tests; verify existing client triggers and competitors read.
 - [x] Add Settings profile, subscription, appearance, and account controls.
 - [x] Test peer refresh conditions, appearance rules, DELETE confirmation, and signed-out protection.
 - [ ] Verify signed-in profile persistence and Settings interactions. Blocked: Lovable Cloud account-session minting reports database unavailable.
