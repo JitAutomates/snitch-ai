@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createServerOnlyFn } from "@tanstack/react-start";
 import {
   buildPeerResolverQuery,
   PEER_RESOLVER_NUM_RESULTS,
@@ -22,14 +22,8 @@ export type ResolvedPeer = {
   rank: number;
 };
 
-function adminDb() {
-  const url = process.env['SUPABASE_URL']!;
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY']!;
-  return createClient(url, key, { auth: { persistSession: false } });
-}
-
-/** ONLY function that may call Exa. Do not import this from client components. */
-export async function resolvePeersWithExa(
+/** ONLY function that may call Exa; ONLY the peer API route may import it. Never import from client components. */
+export const resolvePeersWithExa = createServerOnlyFn(async function resolvePeersWithExa(
   userId: string,
   profile: PeerProfile,
 ): Promise<{ peers: ResolvedPeer[]; query: string }> {
@@ -54,8 +48,8 @@ export async function resolvePeersWithExa(
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Exa error ${res.status}: ${body.slice(0, 400)}`);
+    // Do not expose provider response bodies, which may echo credentials.
+    throw new Error(`Exa request failed (${res.status})`);
   }
 
   const data = (await res.json()) as {
@@ -109,13 +103,15 @@ export async function resolvePeersWithExa(
     if (peers.length >= PEER_RESOLVER_NUM_RESULTS) break;
   }
 
-  const db = adminDb();
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const db = supabaseAdmin as import("@supabase/supabase-js").SupabaseClient;
 
   // Replace previous peer set for this user
-  await db.from("competitors").delete().eq("user_id", userId);
+  const { error: deleteError } = await db.from("competitors").delete().eq("user_id", userId);
+  if (deleteError) throw new Error("Could not replace competitors");
 
   if (peers.length) {
-    await db.from("competitors").insert(
+    const { error: insertError } = await db.from("competitors").insert(
       peers.map((p) => ({
         user_id: userId,
         name: p.name,
@@ -128,9 +124,10 @@ export async function resolvePeersWithExa(
         resolved_at: new Date().toISOString(),
       })),
     );
+    if (insertError) throw new Error("Could not save competitors");
   }
 
-  await db
+  const { error: profileError } = await db
     .from("profiles")
     .update({
       industry: profile.industry,
@@ -143,6 +140,7 @@ export async function resolvePeersWithExa(
       onboarded: true,
     })
     .eq("id", userId);
+  if (profileError) throw new Error("Could not update peer profile");
 
   return { peers, query };
-}
+});
