@@ -3,7 +3,7 @@
 #
 # Required GitHub repo secrets (Settings → Secrets and variables → Actions):
 #   SNITCH_APP_URL          e.g. https://snitchai.org  (no trailing slash)
-#   LOVABLE_CRON_SECRET     same value as Lovable secret LOVABLE_CRON_SECRET
+#   PEER_MONTHLY_CRON_SECRET     same value as the app's dedicated monthly cron secret
 
 name: Monthly peer resolve
 

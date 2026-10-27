@@ -75,7 +75,7 @@ function OnboardingPage() {
   const [salesVolume, setSalesVolume] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const step: Step = STEPS[stepIndex]!;
+  const step: Step = STEPS[stepIndex] ?? "industry";
   const isLast = stepIndex === STEPS.length - 1;
 
   function canContinue(): boolean {
@@ -114,7 +114,7 @@ function OnboardingPage() {
             Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({ reason: "onboarding" }),
-        });
+        }).catch(() => toast.warning("Profile saved, but competitor peers could not be refreshed."));
       }
 
       toast.success("Profile saved.");

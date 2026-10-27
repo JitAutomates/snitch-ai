@@ -22,6 +22,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/monitors")({
@@ -33,6 +35,7 @@ export const Route = createFileRoute("/_authenticated/monitors")({
         content: "Niche news, peer pricing, and competitor alerts for HK founders.",
       },
       { property: "og:title", content: "Monitors | Snitch" },
+      { property: "og:description", content: "Niche news, peer pricing, and competitor alerts for HK founders." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -158,7 +161,8 @@ function Monitors() {
     async function loadPeers() {
       setPeersLoading(true);
       setPeersError(null);
-      const { data, error } = await supabase
+      // Preserve the existing authenticated client while the managed schema lacks peer table types.
+      const { data, error } = await (supabase as SupabaseClient)
         .from("competitors")
         .select("id, name, company_url, scale, sales_estimate, rank, resolved_at")
         .order("rank", { ascending: true });
@@ -167,7 +171,13 @@ function Monitors() {
         setPeersError(error.message);
         setPeers([]);
       } else {
-        setPeers((data ?? []) as PeerRow[]);
+        const parsed = z.array(z.object({
+          id: z.string(), name: z.string(), company_url: z.string().nullable(),
+          scale: z.string().nullable(), sales_estimate: z.string().nullable(),
+          rank: z.number().nullable(), resolved_at: z.string().nullable(),
+        })).safeParse(data ?? []);
+        if (parsed.success) setPeers(parsed.data);
+        else { setPeers([]); setPeersError("Invalid competitor data"); }
       }
       setPeersLoading(false);
     }
