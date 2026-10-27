@@ -1,10 +1,11 @@
 import { authenticateCronRequest } from "@/integrations/supabase/cron-auth";
 import { createClient } from "@supabase/supabase-js";
+import { createFileRoute } from "@tanstack/react-router";
 import { resolvePeersWithExa } from "@/server/peers/resolve-peers";
 
 const ALLOWED = new Set(["onboarding", "profile_change", "monthly"]);
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   const body = (await request.json().catch(() => ({}))) as {
     reason?: string;
     userId?: string;
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
   }
 
   // --- Path A: monthly cron (no user JWT) ---
-    if (body.reason === "monthly") {
+  if (body.reason === "monthly") {
     const authHeader = request.headers.get("authorization") ?? "";
     const token = authHeader.replace(/^Bearer\s+/i, "").trim();
     const monthlySecret = process.env.PEER_MONTHLY_CRON_SECRET ?? "";
@@ -29,6 +30,13 @@ export async function POST(request: Request) {
     if (lovableDenied && !monthlyOk) {
       return lovableDenied;
     }
+
+    // Admin client: bypasses RLS for the cross-user monthly sweep.
+    const db = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false, autoRefreshToken: false, storage: undefined } },
+    );
 
     // Users whose peers are older than ~30 days
     const cutoff = new Date();
@@ -104,3 +112,11 @@ export async function POST(request: Request) {
 
   return Response.json({ ok: true, count: peers.length, peers });
 }
+
+export const Route = createFileRoute("/api/peers/resolve")({
+  server: {
+    handlers: {
+      POST: handlePost,
+    },
+  },
+});
