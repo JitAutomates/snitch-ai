@@ -134,47 +134,58 @@ type CompetitorAlert = {
   severity: "high" | "medium";
 };
 
-const COMPETITOR_ALERTS: CompetitorAlert[] = [
-  {
-    id: "c1",
-    title: "Orbit AI: reported sales uptick in peer band",
-    detail: "Public signals suggest a sharp rise in mid-market deals this month. Review your positioning against their new entry tier.",
-    severity: "high",
-  },
-  {
-    id: "c2",
-    title: "Three new companies entered your industry this quarter",
-    detail: "Fresh HK-registered entities targeting similar buyers. Early pricing is aggressive; monitor free-tier launches.",
-    severity: "medium",
-  },
-  {
-    id: "c3",
-    title: "Nexus Soft in talks that may lead to a merger",
-    detail: "Trade press noted exploratory discussions with a regional tools vendor. Consolidation could reshape shortlists.",
-    severity: "high",
-  },
-  {
-    id: "c4",
-    title: "Harborkit opened a free tier overnight",
-    detail: "Docs and pricing page updated. May pull trials away from paid starters in your band.",
-    severity: "medium",
-  },
-];
-
 function Monitors() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [dayOffset, setDayOffset] = useState(0); // 0 = today, 49 = 49 days ago
   const [alertIndex, setAlertIndex] = useState(0);
+  type PeerRow = {
+    id: string;
+    name: string;
+    company_url: string | null;
+    scale: string | null;
+    sales_estimate: string | null;
+    rank: number | null;
+    resolved_at: string | null;
+  };
+
+  const [peers, setPeers] = useState<PeerRow[]>([]);
+  const [peersLoading, setPeersLoading] = useState(true);
+  const [peersError, setPeersError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPeers() {
+      setPeersLoading(true);
+      setPeersError(null);
+      const { data, error } = await supabase
+        .from("competitors")
+        .select("id, name, company_url, scale, sales_estimate, rank, resolved_at")
+        .order("rank", { ascending: true });
+      if (cancelled) return;
+      if (error) {
+        setPeersError(error.message);
+        setPeers([]);
+      } else {
+        setPeers((data ?? []) as PeerRow[]);
+      }
+      setPeersLoading(false);
+    }
+    void loadPeers();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const issue = NEWS_ARCHIVE[dayOffset]!;
 
-  useEffect(() => {
+   useEffect(() => {
+    if (peers.length === 0) return;
     const t = setInterval(() => {
-      setAlertIndex((i) => (i + 1) % COMPETITOR_ALERTS.length);
+      setAlertIndex((i) => (i + 1) % peers.length);
     }, 5000);
     return () => clearInterval(t);
-  }, []);
+  }, [peers.length]);
 
   async function signOut() {
     await queryClient.cancelQueries();
@@ -183,7 +194,7 @@ function Monitors() {
     navigate({ to: "/auth", replace: true });
   }
 
-  const activeAlert = COMPETITOR_ALERTS[alertIndex]!;
+  const activePeer = peers.length > 0 ? peers[alertIndex % peers.length]! : null;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
