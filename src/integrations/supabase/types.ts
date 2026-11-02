@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      competitors: {
+        Row: {
+          company_url: string | null
+          created_at: string
+          exa_id: string | null
+          id: string
+          name: string
+          rank: number
+          resolved_at: string
+          sales_estimate: string | null
+          scale: string | null
+          source: string
+          user_id: string
+        }
+        Insert: {
+          company_url?: string | null
+          created_at?: string
+          exa_id?: string | null
+          id?: string
+          name: string
+          rank?: number
+          resolved_at?: string
+          sales_estimate?: string | null
+          scale?: string | null
+          source?: string
+          user_id: string
+        }
+        Update: {
+          company_url?: string | null
+          created_at?: string
+          exa_id?: string | null
+          id?: string
+          name?: string
+          rank?: number
+          resolved_at?: string
+          sales_estimate?: string | null
+          scale?: string | null
+          source?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           age_verified: boolean
@@ -21,7 +63,14 @@ export type Database = {
           display_name: string | null
           email_opt_in: boolean
           id: string
+          industry: string | null
           onboarded: boolean
+          peers_resolve_status: string | null
+          peers_resolved_at: string | null
+          product: string | null
+          region: string | null
+          sales_volume: number | null
+          scale: string | null
         }
         Insert: {
           age_verified?: boolean
@@ -29,7 +78,14 @@ export type Database = {
           display_name?: string | null
           email_opt_in?: boolean
           id: string
+          industry?: string | null
           onboarded?: boolean
+          peers_resolve_status?: string | null
+          peers_resolved_at?: string | null
+          product?: string | null
+          region?: string | null
+          sales_volume?: number | null
+          scale?: string | null
         }
         Update: {
           age_verified?: boolean
@@ -37,7 +93,14 @@ export type Database = {
           display_name?: string | null
           email_opt_in?: boolean
           id?: string
+          industry?: string | null
           onboarded?: boolean
+          peers_resolve_status?: string | null
+          peers_resolved_at?: string | null
+          product?: string | null
+          region?: string | null
+          sales_volume?: number | null
+          scale?: string | null
         }
         Relationships: []
       }
