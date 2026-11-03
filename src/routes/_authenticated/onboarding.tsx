@@ -116,6 +116,18 @@ function OnboardingPage() {
           body: JSON.stringify({ reason: "onboarding" }),
         }).catch(() => toast.warning("Profile saved, but competitor peers could not be refreshed."));
       }
+      if (accessToken) {
+        void fetch("/api/news/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ reason: "onboarding" }),
+        }).catch(() => {
+          /* non-blocking */
+        });
+      }
 
       toast.success("Profile saved.");
       navigate({ to: "/dashboard", replace: true });
