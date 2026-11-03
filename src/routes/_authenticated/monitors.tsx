@@ -102,6 +102,9 @@ function Monitors() {
   const [peersLoading, setPeersLoading] = useState(true);
   const [peersError, setPeersError] = useState<string | null>(null);
 
+  const [newsDays, setNewsDays] = useState<NewsDay[]>([]);
+  const [newsLoading, setNewsLoading] = useState(true);
+
   useEffect(() => {
     let cancelled = false;
     async function loadPeers() {
@@ -133,7 +136,59 @@ function Monitors() {
     };
   }, []);
 
-  const issue = NEWS_ARCHIVE[dayOffset]!;
+  useEffect(() => {
+    let cancelled = false;
+    async function loadNews() {
+      setNewsLoading(true);
+      // Safe cast: generated Database types may not include niche_news yet.
+      const { data, error } = await (supabase as SupabaseClient)
+        .from("niche_news")
+        .select("day, headline, body, tag")
+        .order("day", { ascending: false })
+        .limit(150);
+      if (cancelled) return;
+      if (error) {
+        setNewsDays([]);
+      } else {
+        const parsed = z.array(z.object({
+          day: z.string(), headline: z.string(), body: z.string(), tag: z.string(),
+        })).safeParse(data ?? []);
+        if (!parsed.success) {
+          setNewsDays([]);
+        } else {
+          const byDay = new Map<string, NewsArticle[]>();
+          for (const row of parsed.data) {
+            const list = byDay.get(row.day) ?? [];
+            list.push({ headline: row.headline, body: row.body, tag: row.tag });
+            byDay.set(row.day, list);
+          }
+          const days: NewsDay[] = [...byDay.entries()]
+            .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+            .map(([dateKey, articles]) => ({
+              dateKey,
+              // Noon UTC avoids timezone shifting the calendar day.
+              dateLabel: new Date(`${dateKey}T12:00:00Z`).toLocaleDateString("en-HK", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              }),
+              articles,
+            }));
+          setNewsDays(days);
+        }
+      }
+      setNewsLoading(false);
+    }
+    void loadNews();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const maxOffset = Math.max(0, newsDays.length - 1);
+  const clampedOffset = Math.min(dayOffset, maxOffset);
+  const issue = newsDays[clampedOffset];
 
    useEffect(() => {
     if (peers.length === 0) return;
