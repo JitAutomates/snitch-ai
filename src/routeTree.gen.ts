@@ -21,6 +21,7 @@ import { Route as AuthenticatedMonitorsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedPaymentRouteImport } from './routes/_authenticated/payment'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as ApiNewsGenerateRouteImport } from './routes/api/news/generate'
 import { Route as ApiPeersResolveRouteImport } from './routes/api/peers/resolve'
 
 const IndexRoute = IndexRouteImport.update({
@@ -83,6 +84,11 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiNewsGenerateRoute = ApiNewsGenerateRouteImport.update({
+  id: '/api/news/generate',
+  path: '/api/news/generate',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPeersResolveRoute = ApiPeersResolveRouteImport.update({
   id: '/api/peers/resolve',
   path: '/api/peers/resolve',
@@ -101,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/payment': typeof AuthenticatedPaymentRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/api/news/generate': typeof ApiNewsGenerateRoute
   '/api/peers/resolve': typeof ApiPeersResolveRoute
 }
 export interface FileRoutesByTo {
@@ -115,6 +122,7 @@ export interface FileRoutesByTo {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/payment': typeof AuthenticatedPaymentRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/api/news/generate': typeof ApiNewsGenerateRoute
   '/api/peers/resolve': typeof ApiPeersResolveRoute
 }
 export interface FileRoutesById {
@@ -131,6 +139,7 @@ export interface FileRoutesById {
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/payment': typeof AuthenticatedPaymentRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/api/news/generate': typeof ApiNewsGenerateRoute
   '/api/peers/resolve': typeof ApiPeersResolveRoute
 }
 export interface FileRouteTypes {
@@ -147,6 +156,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/payment'
     | '/settings'
+    | '/api/news/generate'
     | '/api/peers/resolve'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/payment'
     | '/settings'
+    | '/api/news/generate'
     | '/api/peers/resolve'
   id:
     | '__root__'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '/_authenticated/onboarding'
     | '/_authenticated/payment'
     | '/_authenticated/settings'
+    | '/api/news/generate'
     | '/api/peers/resolve'
   fileRoutesById: FileRoutesById
 }
@@ -184,6 +196,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ApiNewsGenerateRoute: typeof ApiNewsGenerateRoute
   ApiPeersResolveRoute: typeof ApiPeersResolveRoute
 }
 
@@ -273,6 +286,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/news/generate': {
+      id: '/api/news/generate'
+      path: '/api/news/generate'
+      fullPath: '/api/news/generate'
+      preLoaderRoute: typeof ApiNewsGenerateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/peers/resolve': {
       id: '/api/peers/resolve'
       path: '/api/peers/resolve'
@@ -313,6 +333,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ApiNewsGenerateRoute: ApiNewsGenerateRoute,
   ApiPeersResolveRoute: ApiPeersResolveRoute,
 }
 export const routeTree = rootRouteImport
