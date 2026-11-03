@@ -56,6 +56,39 @@ export type Database = {
         }
         Relationships: []
       }
+      niche_news: {
+        Row: {
+          body: string
+          created_at: string
+          day: string
+          headline: string
+          id: string
+          source_urls: Json
+          tag: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          day: string
+          headline: string
+          id?: string
+          source_urls?: Json
+          tag?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          day?: string
+          headline?: string
+          id?: string
+          source_urls?: Json
+          tag?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           age_verified: boolean
