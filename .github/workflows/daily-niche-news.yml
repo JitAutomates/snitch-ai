@@ -1,0 +1,30 @@
+name: Daily niche news
+
+on:
+  schedule:
+    - cron: "0 1 * * *"   # 01:00 UTC ≈ 09:00 HKT
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Generate niche news
+        env:
+          APP_URL: ${{ secrets.SNITCH_APP_URL }}
+          CRON_SECRET: ${{ secrets.NEWS_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          BASE="${APP_URL%/}"
+          CODE=$(curl -sS -o /tmp/news.json -w "%{http_code}" \
+            -X POST "${BASE}/api/news/generate" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -d '{"reason":"daily"}')
+          echo "HTTP ${CODE}"
+          cat /tmp/news.json || true
+          test "${CODE}" -ge 200 -a "${CODE}" -lt 300
