@@ -51,63 +51,9 @@ const NAV = [
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
-// ---- Placeholder niche news (50 days of synthetic issues) ----
+// ---- Niche news (from public.niche_news) ----
 type NewsArticle = { headline: string; body: string; tag: string };
-
-function buildNewsArchive(): { dateLabel: string; dateKey: string; articles: NewsArticle[] }[] {
-  const seeds: NewsArticle[] = [
-    {
-      tag: "Funding",
-      headline: "Two Central SaaS startups close seed rounds in the same week",
-      body: "Investors favoured B2B tools with clear HK enterprise pilots. Founders noted longer sales cycles but stronger retention after local reference customers.",
-    },
-    {
-      tag: "Policy",
-      headline: "Cyberport cohort opens applications for AI productivity tools",
-      body: "The programme prioritises teams selling into Hong Kong SMEs. Several alumni reported faster intros to corporate IT buyers after demo day.",
-    },
-    {
-      tag: "Market",
-      headline: "Regional logistics software vendors cut entry pricing",
-      body: "Public list prices for mid-tier plans fell about 8–15% across three peers. Analysts linked the moves to slower warehouse digitisation spend.",
-    },
-    {
-      tag: "Talent",
-      headline: "Hiring spike for product engineers in Kowloon East",
-      body: "Job boards showed a rise in full-stack roles at seed-stage companies. Compensation packages increasingly include equity refreshers at 18 months.",
-    },
-    {
-      tag: "Competition",
-      headline: "Singapore-based rival launches Cantonese onboarding",
-      body: "The product is aimed at cross-border founders operating in both cities. Local teams may feel pressure to localise support, not only marketing copy.",
-    },
-  ];
-
-  const out = [];
-  const today = new Date();
-  for (let i = 0; i < 50; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    const dateKey = d.toISOString().slice(0, 10);
-    const dateLabel = d.toLocaleDateString("en-HK", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-    const articles = [0, 1, 2].map((j) => {
-      const s = seeds[(i + j) % seeds.length]!;
-      return {
-        ...s,
-        headline: i === 0 ? s.headline : `${s.headline} (${i}d archive)`,
-      };
-    });
-    out.push({ dateLabel, dateKey, articles });
-  }
-  return out;
-}
-
-const NEWS_ARCHIVE = buildNewsArchive();
+type NewsDay = { dateKey: string; dateLabel: string; articles: NewsArticle[] };
 
 // ---- Placeholder price series (peer band ±50%) ----
 const PRICE_SERIES = [
