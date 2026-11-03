@@ -51,63 +51,9 @@ const NAV = [
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
-// ---- Placeholder niche news (50 days of synthetic issues) ----
+// ---- Niche news (from public.niche_news) ----
 type NewsArticle = { headline: string; body: string; tag: string };
-
-function buildNewsArchive(): { dateLabel: string; dateKey: string; articles: NewsArticle[] }[] {
-  const seeds: NewsArticle[] = [
-    {
-      tag: "Funding",
-      headline: "Two Central SaaS startups close seed rounds in the same week",
-      body: "Investors favoured B2B tools with clear HK enterprise pilots. Founders noted longer sales cycles but stronger retention after local reference customers.",
-    },
-    {
-      tag: "Policy",
-      headline: "Cyberport cohort opens applications for AI productivity tools",
-      body: "The programme prioritises teams selling into Hong Kong SMEs. Several alumni reported faster intros to corporate IT buyers after demo day.",
-    },
-    {
-      tag: "Market",
-      headline: "Regional logistics software vendors cut entry pricing",
-      body: "Public list prices for mid-tier plans fell about 8–15% across three peers. Analysts linked the moves to slower warehouse digitisation spend.",
-    },
-    {
-      tag: "Talent",
-      headline: "Hiring spike for product engineers in Kowloon East",
-      body: "Job boards showed a rise in full-stack roles at seed-stage companies. Compensation packages increasingly include equity refreshers at 18 months.",
-    },
-    {
-      tag: "Competition",
-      headline: "Singapore-based rival launches Cantonese onboarding",
-      body: "The product is aimed at cross-border founders operating in both cities. Local teams may feel pressure to localise support, not only marketing copy.",
-    },
-  ];
-
-  const out = [];
-  const today = new Date();
-  for (let i = 0; i < 50; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    const dateKey = d.toISOString().slice(0, 10);
-    const dateLabel = d.toLocaleDateString("en-HK", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-    const articles = [0, 1, 2].map((j) => {
-      const s = seeds[(i + j) % seeds.length]!;
-      return {
-        ...s,
-        headline: i === 0 ? s.headline : `${s.headline} (${i}d archive)`,
-      };
-    });
-    out.push({ dateLabel, dateKey, articles });
-  }
-  return out;
-}
-
-const NEWS_ARCHIVE = buildNewsArchive();
+type NewsDay = { dateKey: string; dateLabel: string; articles: NewsArticle[] };
 
 // ---- Placeholder price series (peer band ±50%) ----
 const PRICE_SERIES = [
@@ -156,6 +102,9 @@ function Monitors() {
   const [peersLoading, setPeersLoading] = useState(true);
   const [peersError, setPeersError] = useState<string | null>(null);
 
+  const [newsDays, setNewsDays] = useState<NewsDay[]>([]);
+  const [newsLoading, setNewsLoading] = useState(true);
+
   useEffect(() => {
     let cancelled = false;
     async function loadPeers() {
@@ -187,7 +136,59 @@ function Monitors() {
     };
   }, []);
 
-  const issue = NEWS_ARCHIVE[dayOffset]!;
+  useEffect(() => {
+    let cancelled = false;
+    async function loadNews() {
+      setNewsLoading(true);
+      // Safe cast: generated Database types may not include niche_news yet.
+      const { data, error } = await (supabase as SupabaseClient)
+        .from("niche_news")
+        .select("day, headline, body, tag")
+        .order("day", { ascending: false })
+        .limit(150);
+      if (cancelled) return;
+      if (error) {
+        setNewsDays([]);
+      } else {
+        const parsed = z.array(z.object({
+          day: z.string(), headline: z.string(), body: z.string(), tag: z.string(),
+        })).safeParse(data ?? []);
+        if (!parsed.success) {
+          setNewsDays([]);
+        } else {
+          const byDay = new Map<string, NewsArticle[]>();
+          for (const row of parsed.data) {
+            const list = byDay.get(row.day) ?? [];
+            list.push({ headline: row.headline, body: row.body, tag: row.tag });
+            byDay.set(row.day, list);
+          }
+          const days: NewsDay[] = [...byDay.entries()]
+            .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+            .map(([dateKey, articles]) => ({
+              dateKey,
+              // Noon UTC avoids timezone shifting the calendar day.
+              dateLabel: new Date(`${dateKey}T12:00:00Z`).toLocaleDateString("en-HK", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              }),
+              articles,
+            }));
+          setNewsDays(days);
+        }
+      }
+      setNewsLoading(false);
+    }
+    void loadNews();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const maxOffset = Math.max(0, newsDays.length - 1);
+  const clampedOffset = Math.min(dayOffset, maxOffset);
+  const issue = newsDays[clampedOffset];
 
    useEffect(() => {
     if (peers.length === 0) return;
@@ -302,20 +303,20 @@ function Monitors() {
                     type="button"
                     variant="secondary"
                     size="sm"
-                    disabled={dayOffset >= 49}
-                    onClick={() => setDayOffset((d) => Math.min(49, d + 1))}
+                    disabled={clampedOffset >= maxOffset}
+                    onClick={() => setDayOffset((d) => Math.min(maxOffset, d + 1))}
                     aria-label="Older issue"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <span className="min-w-[9rem] text-center text-xs text-muted-foreground">
-                    {dayOffset === 0 ? "Today" : `${dayOffset}d ago`}
+                    {clampedOffset === 0 ? "Latest" : `${clampedOffset}d back`}
                   </span>
                   <Button
                     type="button"
                     variant="secondary"
                     size="sm"
-                    disabled={dayOffset <= 0}
+                    disabled={clampedOffset <= 0}
                     onClick={() => setDayOffset((d) => Math.max(0, d - 1))}
                     aria-label="Newer issue"
                   >
@@ -324,47 +325,57 @@ function Monitors() {
                 </div>
               </div>
 
-              <article
-                className="rounded-sm border border-neutral-700 bg-[#111] px-6 py-8 shadow-inner md:px-10"
-                onTouchStart={(e) => {
-                  (e.currentTarget as HTMLElement).dataset["tx"] = String(e.touches[0]!.clientX);
-                }}
-                onTouchEnd={(e) => {
-                  const start = Number((e.currentTarget as HTMLElement).dataset["tx"] ?? 0);
-                  const end = e.changedTouches[0]!.clientX;
-                  const dx = end - start;
-                  if (dx < -40) setDayOffset((d) => Math.min(49, d + 1)); // swipe left → older
-                  if (dx > 40) setDayOffset((d) => Math.max(0, d - 1));
-                }}
-              >
-                <header className="border-b border-neutral-600 pb-4 text-center">
-                  <p className="text-[10px] uppercase tracking-[0.25em] text-neutral-400">
-                    The Snitch · Hong Kong edition
-                  </p>
-                  <h3 className="mt-2 font-serif text-2xl tracking-tight text-neutral-100 md:text-3xl">
-                    {issue.dateLabel}
-                  </h3>
-                </header>
-                <div className="mt-6 space-y-8">
-                  {issue.articles.map((a, idx) => (
-                    <div
-                      key={`${issue.dateKey}-${idx}`}
-                      className={idx > 0 ? "border-t border-neutral-700 pt-6" : ""}
-                    >
-                      <p className="text-[10px] uppercase tracking-widest text-neutral-500">{a.tag}</p>
-                      <h4 className="mt-1 font-serif text-xl leading-snug text-neutral-100 md:text-2xl">
-                        {a.headline}
-                      </h4>
-                      <p className="mt-3 font-serif text-sm leading-relaxed text-neutral-400 md:text-base">
-                        {a.body}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-8 text-center text-[10px] text-neutral-600">
-                  Swipe left for older issues · up to 50 days
+              {newsLoading ? (
+                <p className="rounded-2xl border border-border/60 bg-card p-5 text-sm text-muted-foreground">
+                  Loading niche news…
                 </p>
-              </article>
+              ) : !issue ? (
+                <p className="rounded-2xl border border-border/60 bg-card p-5 text-sm text-muted-foreground">
+                  No niche news yet. It appears after onboarding or the daily job.
+                </p>
+              ) : (
+                <article
+                  className="rounded-sm border border-neutral-700 bg-[#111] px-6 py-8 shadow-inner md:px-10"
+                  onTouchStart={(e) => {
+                    (e.currentTarget as HTMLElement).dataset["tx"] = String(e.touches[0]!.clientX);
+                  }}
+                  onTouchEnd={(e) => {
+                    const start = Number((e.currentTarget as HTMLElement).dataset["tx"] ?? 0);
+                    const end = e.changedTouches[0]!.clientX;
+                    const dx = end - start;
+                    if (dx < -40) setDayOffset((d) => Math.min(maxOffset, d + 1)); // swipe left → older
+                    if (dx > 40) setDayOffset((d) => Math.max(0, d - 1));
+                  }}
+                >
+                  <header className="border-b border-neutral-600 pb-4 text-center">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-neutral-400">
+                      The Snitch · Hong Kong edition
+                    </p>
+                    <h3 className="mt-2 font-serif text-2xl tracking-tight text-neutral-100 md:text-3xl">
+                      {issue.dateLabel}
+                    </h3>
+                  </header>
+                  <div className="mt-6 space-y-8">
+                    {issue.articles.map((a, idx) => (
+                      <div
+                        key={`${issue.dateKey}-${idx}`}
+                        className={idx > 0 ? "border-t border-neutral-700 pt-6" : ""}
+                      >
+                        <p className="text-[10px] uppercase tracking-widest text-neutral-500">{a.tag}</p>
+                        <h4 className="mt-1 font-serif text-xl leading-snug text-neutral-100 md:text-2xl">
+                          {a.headline}
+                        </h4>
+                        <p className="mt-3 font-serif text-sm leading-relaxed text-neutral-400 md:text-base">
+                          {a.body}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-8 text-center text-[10px] text-neutral-600">
+                    Swipe left for older issues
+                  </p>
+                </article>
+              )}
             </section>
 
             {/* Pricing line chart */}
