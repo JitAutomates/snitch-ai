@@ -27,9 +27,8 @@ export const generateNicheNews = createServerOnlyFn(
     day: string, // YYYY-MM-DD
   ): Promise<{ articles: NicheArticle[] }> {
     const tavilyKey = process.env["TAVILY_API_KEY"];
-    const openaiKey = process.env["OPENAI_API_KEY"];
     if (!tavilyKey) throw new Error("TAVILY_API_KEY is not configured");
-    if (!openaiKey) throw new Error("OPENAI_API_KEY is not configured");
+    
 
     const searchQuery = buildNicheNewsSearchQuery(profile);
     
