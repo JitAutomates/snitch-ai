@@ -25,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { buildPeerPriceSeries, PriceObservations, type PriceObservation, publicCompanyUrl } from "@/lib/peer-pricing";
 
 export const Route = createFileRoute("/_authenticated/monitors")({
   head: () => ({
@@ -55,26 +56,6 @@ const NAV = [
 type NewsArticle = { headline: string; body: string; tag: string };
 type NewsDay = { dateKey: string; dateLabel: string; articles: NewsArticle[] };
 
-// ---- Placeholder price series (peer band ±50%) ----
-const PRICE_SERIES = [
-  { week: "W1", "Orbit AI": 49, "Nexus Soft": 59, "Aether Labs": 39, "Harborkit": 45, "Lantern HQ": 55 },
-  { week: "W2", "Orbit AI": 49, "Nexus Soft": 59, "Aether Labs": 39, "Harborkit": 45, "Lantern HQ": 52 },
-  { week: "W3", "Orbit AI": 45, "Nexus Soft": 59, "Aether Labs": 42, "Harborkit": 45, "Lantern HQ": 52 },
-  { week: "W4", "Orbit AI": 45, "Nexus Soft": 54, "Aether Labs": 42, "Harborkit": 49, "Lantern HQ": 52 },
-  { week: "W5", "Orbit AI": 45, "Nexus Soft": 54, "Aether Labs": 42, "Harborkit": 49, "Lantern HQ": 48 },
-  { week: "W6", "Orbit AI": 43, "Nexus Soft": 54, "Aether Labs": 40, "Harborkit": 49, "Lantern HQ": 48 },
-  { week: "W7", "Orbit AI": 43, "Nexus Soft": 49, "Aether Labs": 40, "Harborkit": 47, "Lantern HQ": 48 },
-  { week: "W8", "Orbit AI": 43, "Nexus Soft": 49, "Aether Labs": 40, "Harborkit": 47, "Lantern HQ": 46 },
-];
-
-const PRICE_LINES = [
-  { key: "Orbit AI", color: "#e8e8e8" },
-  { key: "Nexus Soft", color: "#a3a3a3" },
-  { key: "Aether Labs", color: "#737373" },
-  { key: "Harborkit", color: "#525252" },
-  { key: "Lantern HQ", color: "#d4d4d4" },
-];
-
 // ---- Competitor alerts (carousel) ----
 type CompetitorAlert = {
   id: string;
@@ -104,6 +85,36 @@ function Monitors() {
 
   const [newsDays, setNewsDays] = useState<NewsDay[]>([]);
   const [newsLoading, setNewsLoading] = useState(true);
+  const [prices, setPrices] = useState<PriceObservation[]>([]);
+  const [pricesLoading, setPricesLoading] = useState(true);
+  const [pricesError, setPricesError] = useState<string | null>(null);
+  const priceSeries = useMemo(() => buildPeerPriceSeries(prices), [prices]);
+  const priceCurrencies = [...new Set(priceSeries.lines.map(line => line.currency))];
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPrices() {
+      try {
+        const { data: auth, error: authError } = await supabase.auth.getUser();
+        if (authError || !auth.user) throw new Error("Sign in to load peer pricing.");
+        const since = new Date(Date.now() - 12 * 7 * 24 * 60 * 60 * 1000).toISOString();
+        const { data, error } = await (supabase as SupabaseClient).from("peer_prices")
+          .select("competitor_id, competitor_name, currency, amount, observed_at, source_url, plan_label")
+          .eq("user_id", auth.user.id).gte("observed_at", since)
+          .order("observed_at", { ascending: false }).limit(5000);
+        if (error) throw new Error(error.message);
+        const parsed = PriceObservations.safeParse(data ?? []);
+        if (!parsed.success) throw new Error("Invalid peer pricing data.");
+        if (!cancelled) setPrices(parsed.data);
+      } catch (error) {
+        if (!cancelled) setPricesError(error instanceof Error ? error.message : "Could not load peer pricing.");
+      } finally {
+        if (!cancelled) setPricesLoading(false);
+      }
+    }
+    void loadPrices();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -205,7 +216,7 @@ function Monitors() {
     navigate({ to: "/auth", replace: true });
   }
 
-  const activePeer = peers.length > 0 ? peers[alertIndex % peers.length]! : null;
+   const activePeer = peers.length > 0 ? peers[alertIndex % peers.length] ?? null : null;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -337,11 +348,14 @@ function Monitors() {
                 <article
                   className="rounded-sm border border-neutral-700 bg-[#111] px-6 py-8 shadow-inner md:px-10"
                   onTouchStart={(e) => {
-                    (e.currentTarget as HTMLElement).dataset["tx"] = String(e.touches[0]!.clientX);
+                    const touch = e.touches[0];
+                    if (touch) (e.currentTarget as HTMLElement).dataset["tx"] = String(touch.clientX);
                   }}
                   onTouchEnd={(e) => {
                     const start = Number((e.currentTarget as HTMLElement).dataset["tx"] ?? 0);
-                    const end = e.changedTouches[0]!.clientX;
+                    const touch = e.changedTouches[0];
+                    if (!touch) return;
+                    const end = touch.clientX;
                     const dx = end - start;
                     if (dx < -40) setDayOffset((d) => Math.min(maxOffset, d + 1)); // swipe left → older
                     if (dx > 40) setDayOffset((d) => Math.max(0, d - 1));
@@ -382,37 +396,58 @@ function Monitors() {
             <section>
               <h2 className="mb-1 text-lg tracking-tight">Peer pricing</h2>
               <p className="mb-4 text-sm text-muted-foreground">
-                Placeholder chart: top peers in a ±50% sales band (entry plan, USD/mo). Later this uses your onboarding sales volume.
+                Entry/list prices from competitor websites (peers only). Not live checkout quotes.
               </p>
+              {pricesLoading ? (
+                <p className="text-sm text-muted-foreground">Loading peer pricing…</p>
+              ) : pricesError ? (
+                <p className="text-sm text-destructive">Could not load peer pricing: {pricesError}</p>
+              ) : priceSeries.lines.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No peer pricing yet. Pricing is extracted from competitor sites after peers resolve.</p>
+              ) : (
               <div className="rounded-2xl border border-border/60 bg-card p-4 md:p-6">
-                <div className="h-72 w-full">
+                {priceCurrencies.map(currency => (
+                <div key={currency} className="mb-4 h-72 w-full" aria-label={`Peer pricing in ${currency}`}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={PRICE_SERIES} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                      <XAxis dataKey="week" stroke="#888" fontSize={12} />
-                      <YAxis stroke="#888" fontSize={12} unit="$" />
+                    <LineChart data={priceSeries.points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="date" stroke="var(--muted-foreground)" fontSize={12} tickFormatter={(day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString("en-HK", { month: "short", day: "numeric", timeZone: "UTC" })} />
+                      <YAxis stroke="var(--muted-foreground)" fontSize={12} />
                       <Tooltip
                         contentStyle={{
-                          background: "#1a1a1a",
-                          border: "1px solid #333",
+                          background: "var(--card)",
+                          border: "1px solid var(--border)",
                           borderRadius: 8,
                         }}
+                        formatter={(value: number) => [`${currency} ${value.toLocaleString("en-HK")}`]}
                       />
                       <Legend />
-                      {PRICE_LINES.map((l) => (
+                      {priceSeries.lines.filter(line => line.currency === currency).map((l, index) => (
                         <Line
                           key={l.key}
                           type="monotone"
-                          dataKey={l.key}
-                          stroke={l.color}
+                          dataKey={(point: Record<string, number | string>) => point[l.key]}
+                          name={l.name}
+                          stroke={`var(--chart-${index % 5 + 1})`}
+                          strokeDasharray={index >= 5 ? "5 3" : undefined}
                           strokeWidth={2}
-                          dot={false}
+                          dot={{ r: 3 }}
                         />
                       ))}
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
+                ))}
+                <p className="text-xs text-muted-foreground">AI estimate from public sources</p>
+                <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  {[...new Map(prices.filter(row => row.amount !== null && publicCompanyUrl(row.source_url)).map(row => [row.competitor_id, row])).values()].map(row => (
+                    <li key={row.competitor_id}>
+                      <a href={row.source_url ?? undefined} target="_blank" rel="noopener noreferrer" className="underline">{row.competitor_name}: {row.plan_label}</a>
+                    </li>
+                  ))}
+                </ul>
               </div>
+              )}
             </section>
           </div>
         </main>

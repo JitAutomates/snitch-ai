@@ -14,3 +14,5 @@
 - Only `resolvePeersWithExa` in `src/server/peers/resolve-peers.ts` may contact Exa; only POST `/api/peers/resolve` may import it, dynamically inside its server handler, to keep secrets out of client bundles.
 - Peer resolution accepts only onboarding/profile_change with a verified user JWT or monthly with a verified cron bearer; user IDs always come from verified auth or cron-authorized due profiles, never request bodies.
 - Keep the Exa call-path guard in CI and security regression tests to prevent new client or alternate resolver paths.
+- Pricing provider calls live only in `src/server/pricing/extract-peer-prices.ts`, dynamically imported by the authenticated pricing POST handler; browser-safe parsing and series helpers live in `src/lib/peer-pricing.ts` so UI never imports provider code.
+- Peer-pricing SQL is provided for manual execution in `docs/peer-prices.sql`; history is append-only and charts separate currencies to avoid treating incomparable prices as one series.
