@@ -114,6 +114,19 @@ function OnboardingPage() {
             Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({ reason: "onboarding" }),
+        }).then(async response => {
+          if (!response.ok) {
+            toast.warning("Profile saved, but competitor peers could not be refreshed.");
+            return;
+          }
+          // Run only after peers have actually been saved, never in parallel with discovery.
+          void fetch("/api/pricing/refresh", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+            body: JSON.stringify({ reason: "onboarding" }),
+          }).then(result => {
+            if (!result.ok) toast.warning("Profile saved, but peer pricing could not be collected.");
+          }).catch(() => toast.warning("Profile saved, but peer pricing could not be collected."));
         }).catch(() => toast.warning("Profile saved, but competitor peers could not be refreshed."));
       }
       if (accessToken) {

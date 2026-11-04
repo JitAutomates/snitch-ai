@@ -1,4 +1,6 @@
 # Current task
+- [ ] Add peer-pricing SQL for user execution, website-only extractor, authenticated refresh, onboarding trigger and real chart.
+- [ ] Verify pricing boundaries, plan selection, route registration and read-only chart; report SQL/credential blockers.
 - [ ] Enforce exclusive Exa resolver path, JWT/cron authentication, and server-only secrets.
 - [ ] Add call-path guard and security regression tests; verify existing client triggers and competitors read.
 - [x] Add Settings profile, subscription, appearance, and account controls.
