@@ -1,0 +1,39 @@
+name: Monthly peer pricing
+
+on:
+  schedule:
+    # 02:00 UTC on the 1st of each month (~10:00 HKT)
+    - cron: "0 2 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  refresh-pricing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Refresh peer prices
+        env:
+          APP_URL: ${{ secrets.SNITCH_APP_URL }}
+          CRON_SECRET: ${{ secrets.NEWS_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_URL:-}" ]; then
+            echo "Missing secret SNITCH_APP_URL"
+            exit 1
+          fi
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "Missing secret NEWS_CRON_SECRET (or set PEER_MONTHLY_CRON_SECRET and change this workflow)"
+            exit 1
+          fi
+          BASE="${APP_URL%/}"
+          CODE=$(curl -sS -o /tmp/pricing.json -w "%{http_code}" \
+            -X POST "${BASE}/api/pricing/refresh" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -d '{"reason":"daily"}')
+          echo "HTTP ${CODE}"
+          cat /tmp/pricing.json || true
+          test "${CODE}" -ge 200 -a "${CODE}" -lt 300
