@@ -28,10 +28,9 @@ export const generateNicheNews = createServerOnlyFn(
   ): Promise<{ articles: NicheArticle[] }> {
     const tavilyKey = process.env["TAVILY_API_KEY"];
     if (!tavilyKey) throw new Error("TAVILY_API_KEY is not configured");
-    
 
     const searchQuery = buildNicheNewsSearchQuery(profile);
-    
+
     const tavilyRes = await fetch("https://api.tavily.com/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -74,13 +73,10 @@ export const generateNicheNews = createServerOnlyFn(
     );
     const llmModel = process.env["LLM_MODEL"] ?? "openrouter/free";
 
-    // ... existing Tavily search unchanged ...
-
     const llmHeaders: Record<string, string> = {
       "Content-Type": "application/json",
       Authorization: `Bearer ${llmKey}`,
     };
-    // OpenRouter optional ranking headers
     if (process.env["LLM_HTTP_REFERER"]) {
       llmHeaders["HTTP-Referer"] = process.env["LLM_HTTP_REFERER"];
     }
@@ -88,27 +84,40 @@ export const generateNicheNews = createServerOnlyFn(
       llmHeaders["X-Title"] = process.env["LLM_APP_TITLE"];
     }
 
-    const llmRes = await fetch(`${llmBase}/chat/completions`, {
-      method: "POST",
-      headers: llmHeaders,
-      body: JSON.stringify({
+    const baseMessages = [
+      { role: "system" as const, content: buildNicheNewsSystemPrompt() },
+      {
+        role: "user" as const,
+        content: buildNicheNewsUserPrompt({
+          ...profile,
+          searchContext:
+            searchContext || "No search hits; write cautious generic sector notes.",
+        }),
+      },
+    ];
+
+    async function chat(body: Record<string, unknown>) {
+      return fetch(`${llmBase}/chat/completions`, {
+        method: "POST",
+        headers: llmHeaders,
+        body: JSON.stringify(body),
+      });
+    }
+
+    let llmRes = await chat({
+      model: llmModel,
+      temperature: 0.3,
+      response_format: { type: "json_object" },
+      messages: baseMessages,
+    });
+    // Many free models reject response_format — retry without it.
+    if (llmRes.status === 400) {
+      llmRes = await chat({
         model: llmModel,
         temperature: 0.3,
-        // Some free models ignore/reject this; if 400, retry without it (see note).
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: buildNicheNewsSystemPrompt() },
-          {
-            role: "user",
-            content: buildNicheNewsUserPrompt({
-              ...profile,
-              searchContext:
-                searchContext || "No search hits; write cautious generic sector notes.",
-            }),
-          },
-        ],
-      }),
-    });
+        messages: baseMessages,
+      });
+    }
     if (!llmRes.ok) {
       throw new Error(`LLM request failed (${llmRes.status})`);
     }
@@ -116,7 +125,7 @@ export const generateNicheNews = createServerOnlyFn(
     const llmData = (await llmRes.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
     };
-        const raw = llmData.choices?.[0]?.message?.content ?? "{}";
+    const raw = llmData.choices?.[0]?.message?.content ?? "{}";
     let parsed: { articles?: Array<{ tag?: string; headline?: string; body?: string }> };
     try {
       parsed = JSON.parse(raw) as typeof parsed;
@@ -125,6 +134,14 @@ export const generateNicheNews = createServerOnlyFn(
     }
 
     const articles: NicheArticle[] = (parsed.articles ?? [])
+      .map((a) => ({
+        tag: String(a.tag ?? "Market").slice(0, 40),
+        headline: String(a.headline ?? "").trim().slice(0, 200),
+        body: String(a.body ?? "").trim().slice(0, 2000),
+        source_urls: sourceUrls,
+      }))
+      .filter((a) => a.headline && a.body)
+      .slice(0, NICHE_NEWS_ARTICLE_COUNT);
 
     if (articles.length === 0) {
       throw new Error("No articles produced");
@@ -133,7 +150,6 @@ export const generateNicheNews = createServerOnlyFn(
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const db = supabaseAdmin as import("@supabase/supabase-js").SupabaseClient;
 
-    // Replace this user's articles for that calendar day
     await db.from("niche_news").delete().eq("user_id", userId).eq("day", day);
 
     const { error: insertError } = await db.from("niche_news").insert(
