@@ -117,17 +117,15 @@ export const generateNicheNews = createServerOnlyFn(
     const llmData = (await llmRes.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
     };
-    const raw = llmData.choices?.[0]?.message?.content ?? "{}";
+        const raw = llmData.choices?.[0]?.message?.content ?? "{}";
+    let parsed: { articles?: Array<{ tag?: string; headline?: string; body?: string }> };
+    try {
+      parsed = JSON.parse(raw) as typeof parsed;
+    } catch {
+      throw new Error("LLM returned invalid JSON");
+    }
 
     const articles: NicheArticle[] = (parsed.articles ?? [])
-      .map((a) => ({
-        tag: String(a.tag ?? "Market").slice(0, 40),
-        headline: String(a.headline ?? "").trim().slice(0, 200),
-        body: String(a.body ?? "").trim().slice(0, 2000),
-        source_urls: sourceUrls,
-      }))
-      .filter((a) => a.headline && a.body)
-      .slice(0, NICHE_NEWS_ARTICLE_COUNT);
 
     if (articles.length === 0) {
       throw new Error("No articles produced");
