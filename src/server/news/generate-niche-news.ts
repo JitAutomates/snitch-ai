@@ -32,7 +32,10 @@ export const generateNicheNews = createServerOnlyFn(
     if (!openaiKey) throw new Error("OPENAI_API_KEY is not configured");
 
     const searchQuery = buildNicheNewsSearchQuery(profile);
-
+    
+    const openaiKey = process.env["OPENAI_API_KEY"];
+    if (!openaiKey) throw new Error("OPENAI_API_KEY is not configured");
+    
     const tavilyRes = await fetch("https://api.tavily.com/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
