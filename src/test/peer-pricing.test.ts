@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { buildPeerPriceSeries, chooseEntryPrice, PRICING_PEER_LIMIT, publicCompanyUrl, type PriceObservation } from '@/lib/peer-pricing';
+import { buildPeerPriceSeries, chooseEntryPrice, PRICING_PEER_LIMIT, publicCompanyUrl, summarizePeerPricing, type PriceObservation } from '@/lib/peer-pricing';
 const url = 'https://example.com/';
 const price = (amount: number | null, confidence: 'high' | 'low' = 'high', source_url = url, currency = 'USD') => ({
   amount, confidence, source_url, currency, plan_label: 'Starter', amount_display: amount === null ? 'Contact sales' : `$${amount}/month`,
