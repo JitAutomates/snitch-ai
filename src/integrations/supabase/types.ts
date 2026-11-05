@@ -89,6 +89,62 @@ export type Database = {
         }
         Relationships: []
       }
+      peer_prices: {
+        Row: {
+          amount: number | null
+          amount_display: string | null
+          company_url: string | null
+          competitor_id: string
+          competitor_name: string
+          created_at: string
+          currency: string
+          id: string
+          notes: string | null
+          observed_at: string
+          plan_label: string
+          source_url: string | null
+          user_id: string
+        }
+        Insert: {
+          amount?: number | null
+          amount_display?: string | null
+          company_url?: string | null
+          competitor_id: string
+          competitor_name: string
+          created_at?: string
+          currency?: string
+          id?: string
+          notes?: string | null
+          observed_at?: string
+          plan_label?: string
+          source_url?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number | null
+          amount_display?: string | null
+          company_url?: string | null
+          competitor_id?: string
+          competitor_name?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          notes?: string | null
+          observed_at?: string
+          plan_label?: string
+          source_url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "peer_prices_competitor_id_fkey"
+            columns: ["competitor_id"]
+            isOneToOne: false
+            referencedRelation: "competitors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           age_verified: boolean

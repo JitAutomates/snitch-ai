@@ -37,6 +37,21 @@ export const PriceObservations = z.array(z.object({
   source_url: z.string().nullable(), plan_label: z.string(),
 }));
 export type PriceObservation = z.infer<typeof PriceObservations>[number];
+export type PeerPricingSummary =
+  | { state: 'fetching' }
+  | { state: 'empty' }
+  | { state: 'all-null' }
+  | { state: 'ready'; nullNames: string[] };
+export function summarizePeerPricing(observations: PriceObservation[], runStatus: string | null): PeerPricingSummary {
+  if (runStatus === 'running') return { state: 'fetching' };
+  if (observations.length === 0) return { state: 'empty' };
+  const latest = new Map<string, PriceObservation>();
+  for (const row of [...observations].sort((a, b) => b.observed_at.localeCompare(a.observed_at))) {
+    if (!latest.has(row.competitor_id)) latest.set(row.competitor_id, row);
+  }
+  const nullNames = [...latest.values()].filter(r => r.amount === null).map(r => r.competitor_name);
+  return nullNames.length === latest.size ? { state: 'all-null' } : { state: 'ready', nullNames };
+}
 export function buildPeerPriceSeries(observations: PriceObservation[]) {
   const lines = new Map<string, { key: string; name: string; currency: string }>();
   const points = new Map<string, Record<string, number | string>>();

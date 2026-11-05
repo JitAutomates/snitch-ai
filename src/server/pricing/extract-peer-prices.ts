@@ -24,6 +24,29 @@ export const extractPeerPrices = createServerOnlyFn(async (userId: string) => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const db = supabaseAdmin as SupabaseClient;
 
+  // Best-effort run marker so /monitors can show progress; a missing table must not block collection.
+  const { data: runRow } = await db
+    .from("peer_price_runs")
+    .insert({ user_id: userId, status: "running" })
+    .select("id")
+    .single();
+  const runId = (runRow as { id?: string } | null)?.id;
+  let failed = true;
+  try {
+    const result = await collectPeerPrices(db, userId);
+    failed = false;
+    return result;
+  } finally {
+    if (runId) {
+      await db
+        .from("peer_price_runs")
+        .update({ status: failed ? "failed" : "done", finished_at: new Date().toISOString() })
+        .eq("id", runId);
+    }
+  }
+});
+
+async function collectPeerPrices(db: SupabaseClient, userId: string) {
   const { data, error } = await db
     .from("competitors")
     .select("id, name, company_url")
@@ -86,6 +109,9 @@ export const extractPeerPrices = createServerOnlyFn(async (userId: string) => {
         }),
       });
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          throw new Error(`Website extraction failed (${response.status})`);
+        }
         failures.push(`${peer.name}: extract ${response.status}`);
         skipped++;
         continue;
@@ -191,7 +217,7 @@ export const extractPeerPrices = createServerOnlyFn(async (userId: string) => {
       updated++;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "peer failed";
-      if (msg.includes("Could not save peer prices")) throw err;
+      if (msg.includes("Could not save peer prices") || msg.includes("Website extraction failed")) throw err;
       failures.push(`${peer.name}: ${msg.slice(0, 80)}`);
       skipped++;
     }
@@ -202,4 +228,4 @@ export const extractPeerPrices = createServerOnlyFn(async (userId: string) => {
     skipped,
     failures: failures.slice(0, 10),
   };
-});
+}

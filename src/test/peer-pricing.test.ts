@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { buildPeerPriceSeries, chooseEntryPrice, PRICING_PEER_LIMIT, publicCompanyUrl, type PriceObservation } from '@/lib/peer-pricing';
+import { buildPeerPriceSeries, chooseEntryPrice, PRICING_PEER_LIMIT, publicCompanyUrl, summarizePeerPricing, type PriceObservation } from '@/lib/peer-pricing';
 const url = 'https://example.com/';
 const price = (amount: number | null, confidence: 'high' | 'low' = 'high', source_url = url, currency = 'USD') => ({
   amount, confidence, source_url, currency, plan_label: 'Starter', amount_display: amount === null ? 'Contact sales' : `$${amount}/month`,
@@ -32,5 +32,27 @@ describe('peer pricing rules', () => {
     ]);
     expect(series.lines.map(line => line.currency)).toEqual(['USD', 'HKD']);
     expect(series.points).toEqual([{ date: '2026-11-01', 'peer1:USD': 39 }, { date: '2026-11-02', 'peer1:HKD': 300 }]);
+  });
+});
+describe('pricing chart states', () => {
+  const obs = (competitor_id: string, competitor_name: string, amount: number | null, observed_at: string): PriceObservation => ({ competitor_id, competitor_name, amount, currency: 'USD', observed_at, source_url: url, plan_label: 'Starter' });
+  it('shows fetching while a run is in progress', () => {
+    expect(summarizePeerPricing([obs('a', 'Aether', 42, '2026-11-01T00:00:00Z')], 'running').state).toBe('fetching');
+  });
+  it('shows empty when no pricing history exists', () => {
+    expect(summarizePeerPricing([], null).state).toBe('empty');
+    expect(summarizePeerPricing([], 'done').state).toBe('empty');
+  });
+  it('flags all-null when every latest observation is null', () => {
+    const summary = summarizePeerPricing([obs('a', 'Aether', null, '2026-11-01T00:00:00Z'), obs('b', 'Nexus', null, '2026-11-01T00:00:00Z')], 'done');
+    expect(summary.state).toBe('all-null');
+  });
+  it('names only competitors whose latest observation is null', () => {
+    const summary = summarizePeerPricing([
+      obs('a', 'Aether', 42, '2026-11-01T00:00:00Z'),
+      obs('b', 'Nexus', 39, '2026-11-01T00:00:00Z'),
+      obs('b', 'Nexus', null, '2026-11-02T00:00:00Z'),
+    ], 'done');
+    expect(summary).toEqual({ state: 'ready', nullNames: ['Nexus'] });
   });
 });

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
   Radar,
@@ -25,7 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { buildPeerPriceSeries, PriceObservations, type PriceObservation, publicCompanyUrl } from "@/lib/peer-pricing";
+import { buildPeerPriceSeries, PriceObservations, type PriceObservation, publicCompanyUrl, summarizePeerPricing } from "@/lib/peer-pricing";
 
 export const Route = createFileRoute("/_authenticated/monitors")({
   head: () => ({
@@ -88,33 +88,52 @@ function Monitors() {
   const [prices, setPrices] = useState<PriceObservation[]>([]);
   const [pricesLoading, setPricesLoading] = useState(true);
   const [pricesError, setPricesError] = useState<string | null>(null);
+  const [runStatus, setRunStatus] = useState<string | null>(null);
   const priceSeries = useMemo(() => buildPeerPriceSeries(prices), [prices]);
   const priceCurrencies = [...new Set(priceSeries.lines.map(line => line.currency))];
+  const pricingSummary = useMemo(() => summarizePeerPricing(prices, runStatus), [prices, runStatus]);
+
+  const loadPrices = useCallback(async () => {
+    try {
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError || !auth.user) throw new Error("Sign in to load peer pricing.");
+      const since = new Date(Date.now() - 12 * 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await (supabase as SupabaseClient).from("peer_prices")
+        .select("competitor_id, competitor_name, currency, amount, observed_at, source_url, plan_label")
+        .eq("user_id", auth.user.id).gte("observed_at", since)
+        .order("observed_at", { ascending: false }).limit(5000);
+      if (error) throw new Error(error.message);
+      const parsed = PriceObservations.safeParse(data ?? []);
+      if (!parsed.success) throw new Error("Invalid peer pricing data.");
+      setPrices(parsed.data);
+      setPricesError(null);
+      // Latest collection run; the table may not exist yet, so ignore errors.
+      const { data: runData } = await (supabase as SupabaseClient).from("peer_price_runs")
+        .select("status, started_at").eq("user_id", auth.user.id)
+        .order("started_at", { ascending: false }).limit(1);
+      const run = z.array(z.object({ status: z.string(), started_at: z.string() })).safeParse(runData ?? []);
+      const latest = run.success ? run.data[0] : undefined;
+      const fresh = latest ? Date.now() - new Date(latest.started_at).getTime() < 15 * 60 * 1000 : false;
+      setRunStatus(latest?.status === "running" && fresh ? "running" : latest?.status ?? null);
+    } catch (error) {
+      setPricesError(error instanceof Error ? error.message : "Could not load peer pricing.");
+    } finally {
+      setPricesLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    async function loadPrices() {
-      try {
-        const { data: auth, error: authError } = await supabase.auth.getUser();
-        if (authError || !auth.user) throw new Error("Sign in to load peer pricing.");
-        const since = new Date(Date.now() - 12 * 7 * 24 * 60 * 60 * 1000).toISOString();
-        const { data, error } = await (supabase as SupabaseClient).from("peer_prices")
-          .select("competitor_id, competitor_name, currency, amount, observed_at, source_url, plan_label")
-          .eq("user_id", auth.user.id).gte("observed_at", since)
-          .order("observed_at", { ascending: false }).limit(5000);
-        if (error) throw new Error(error.message);
-        const parsed = PriceObservations.safeParse(data ?? []);
-        if (!parsed.success) throw new Error("Invalid peer pricing data.");
-        if (!cancelled) setPrices(parsed.data);
-      } catch (error) {
-        if (!cancelled) setPricesError(error instanceof Error ? error.message : "Could not load peer pricing.");
-      } finally {
-        if (!cancelled) setPricesLoading(false);
-      }
-    }
     void loadPrices();
-    return () => { cancelled = true; };
-  }, []);
+  }, [loadPrices]);
+
+  // While a collection run is in progress, re-check until it finishes.
+  useEffect(() => {
+    if (runStatus !== "running") return;
+    const t = setInterval(() => {
+      void loadPrices();
+    }, 10000);
+    return () => clearInterval(t);
+  }, [runStatus, loadPrices]);
 
   useEffect(() => {
     let cancelled = false;
@@ -402,8 +421,18 @@ function Monitors() {
                 <p className="text-sm text-muted-foreground">Loading peer pricing…</p>
               ) : pricesError ? (
                 <p className="text-sm text-destructive">Could not load peer pricing: {pricesError}</p>
-              ) : priceSeries.lines.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No peer pricing yet. Pricing is extracted from competitor sites after peers resolve.</p>
+              ) : pricingSummary.state === "fetching" ? (
+                <p className="rounded-2xl border border-border/60 bg-card p-5 text-sm text-muted-foreground">
+                  Fetching pricing information…
+                </p>
+              ) : pricingSummary.state === "empty" ? (
+                <p className="rounded-2xl border border-border/60 bg-card p-5 text-sm text-muted-foreground">
+                  No pricing information yet. Will appear after monthly refresh.
+                </p>
+              ) : pricingSummary.state === "all-null" ? (
+                <p className="rounded-2xl border border-border/60 bg-card p-5 text-sm text-muted-foreground">
+                  Pricing information is not public for all competitors listed. It is important that Snitch AI only searches for public information in correspondence with ethical computer use ordinances.
+                </p>
               ) : (
               <div className="rounded-2xl border border-border/60 bg-card p-4 md:p-6">
                 {priceCurrencies.map(currency => (
@@ -439,6 +468,11 @@ function Monitors() {
                 </div>
                 ))}
                 <p className="text-xs text-muted-foreground">AI estimate from public sources</p>
+                {pricingSummary.state === "ready" && pricingSummary.nullNames.length > 0 && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Pricing information is not public for {pricingSummary.nullNames.join(", ")}. It is important that Snitch AI only searches for public information in correspondence with ethical computer use ordinances.
+                  </p>
+                )}
                 <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
                   {[...new Map(prices.filter(row => row.amount !== null && publicCompanyUrl(row.source_url)).map(row => [row.competitor_id, row])).values()].map(row => (
                     <li key={row.competitor_id}>

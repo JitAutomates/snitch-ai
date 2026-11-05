@@ -23,4 +23,18 @@ CREATE POLICY "Users read own peer prices" ON public.peer_prices
   FOR SELECT TO authenticated USING (auth.uid() = user_id);
 CREATE INDEX peer_prices_user_observed_idx ON public.peer_prices (user_id, observed_at DESC);
 CREATE INDEX peer_prices_user_competitor_observed_idx ON public.peer_prices (user_id, competitor_id, observed_at DESC);
+CREATE TABLE public.peer_price_runs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  status text NOT NULL CHECK (status IN ('running', 'done', 'failed')),
+  started_at timestamptz NOT NULL DEFAULT now(),
+  finished_at timestamptz
+);
+GRANT SELECT ON public.peer_price_runs TO authenticated;
+GRANT ALL ON public.peer_price_runs TO service_role;
+REVOKE ALL ON public.peer_price_runs FROM anon;
+ALTER TABLE public.peer_price_runs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users read own peer price runs" ON public.peer_price_runs
+  FOR SELECT TO authenticated USING (auth.uid() = user_id);
+CREATE INDEX peer_price_runs_user_started_idx ON public.peer_price_runs (user_id, started_at DESC);
 NOTIFY pgrst, 'reload schema';
