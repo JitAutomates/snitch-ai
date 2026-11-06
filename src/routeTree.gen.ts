@@ -21,6 +21,7 @@ import { Route as AuthenticatedMonitorsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedPaymentRouteImport } from './routes/_authenticated/payment'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as ApiActivityRefreshRouteImport } from './routes/api/activity/refresh'
 import { Route as ApiNewsGenerateRouteImport } from './routes/api/news/generate'
 import { Route as ApiPeersResolveRouteImport } from './routes/api/peers/resolve'
 import { Route as ApiPricingRefreshRouteImport } from './routes/api/pricing/refresh'
@@ -85,6 +86,11 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiActivityRefreshRoute = ApiActivityRefreshRouteImport.update({
+  id: '/api/activity/refresh',
+  path: '/api/activity/refresh',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiNewsGenerateRoute = ApiNewsGenerateRouteImport.update({
   id: '/api/news/generate',
   path: '/api/news/generate',
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/payment': typeof AuthenticatedPaymentRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/api/activity/refresh': typeof ApiActivityRefreshRoute
   '/api/news/generate': typeof ApiNewsGenerateRoute
   '/api/peers/resolve': typeof ApiPeersResolveRoute
   '/api/pricing/refresh': typeof ApiPricingRefreshRoute
@@ -129,6 +136,7 @@ export interface FileRoutesByTo {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/payment': typeof AuthenticatedPaymentRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/api/activity/refresh': typeof ApiActivityRefreshRoute
   '/api/news/generate': typeof ApiNewsGenerateRoute
   '/api/peers/resolve': typeof ApiPeersResolveRoute
   '/api/pricing/refresh': typeof ApiPricingRefreshRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/payment': typeof AuthenticatedPaymentRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/api/activity/refresh': typeof ApiActivityRefreshRoute
   '/api/news/generate': typeof ApiNewsGenerateRoute
   '/api/peers/resolve': typeof ApiPeersResolveRoute
   '/api/pricing/refresh': typeof ApiPricingRefreshRoute
@@ -165,6 +174,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/payment'
     | '/settings'
+    | '/api/activity/refresh'
     | '/api/news/generate'
     | '/api/peers/resolve'
     | '/api/pricing/refresh'
@@ -181,6 +191,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/payment'
     | '/settings'
+    | '/api/activity/refresh'
     | '/api/news/generate'
     | '/api/peers/resolve'
     | '/api/pricing/refresh'
@@ -198,6 +209,7 @@ export interface FileRouteTypes {
     | '/_authenticated/onboarding'
     | '/_authenticated/payment'
     | '/_authenticated/settings'
+    | '/api/activity/refresh'
     | '/api/news/generate'
     | '/api/peers/resolve'
     | '/api/pricing/refresh'
@@ -208,6 +220,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ApiActivityRefreshRoute: typeof ApiActivityRefreshRoute
   ApiNewsGenerateRoute: typeof ApiNewsGenerateRoute
   ApiPeersResolveRoute: typeof ApiPeersResolveRoute
   ApiPricingRefreshRoute: typeof ApiPricingRefreshRoute
@@ -299,6 +312,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/activity/refresh': {
+      id: '/api/activity/refresh'
+      path: '/api/activity/refresh'
+      fullPath: '/api/activity/refresh'
+      preLoaderRoute: typeof ApiActivityRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/news/generate': {
       id: '/api/news/generate'
       path: '/api/news/generate'
@@ -353,6 +373,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ApiActivityRefreshRoute: ApiActivityRefreshRoute,
   ApiNewsGenerateRoute: ApiNewsGenerateRoute,
   ApiPeersResolveRoute: ApiPeersResolveRoute,
   ApiPricingRefreshRoute: ApiPricingRefreshRoute,
