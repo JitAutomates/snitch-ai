@@ -14,6 +14,127 @@ export type Database = {
   }
   public: {
     Tables: {
+      competitor_activity: {
+        Row: {
+          category: string
+          company_url: string | null
+          competitor_id: string | null
+          competitor_name: string
+          created_at: string
+          headline: string
+          id: string
+          published_at: string | null
+          source_url: string
+          summary: string
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          category?: string
+          company_url?: string | null
+          competitor_id?: string | null
+          competitor_name: string
+          created_at?: string
+          headline: string
+          id?: string
+          published_at?: string | null
+          source_url: string
+          summary: string
+          user_id: string
+          week_start: string
+        }
+        Update: {
+          category?: string
+          company_url?: string | null
+          competitor_id?: string | null
+          competitor_name?: string
+          created_at?: string
+          headline?: string
+          id?: string
+          published_at?: string | null
+          source_url?: string
+          summary?: string
+          user_id?: string
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_activity_competitor_id_fkey"
+            columns: ["competitor_id"]
+            isOneToOne: false
+            referencedRelation: "competitors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      competitor_activity_runs: {
+        Row: {
+          finished_at: string | null
+          id: string
+          started_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          finished_at?: string | null
+          id?: string
+          started_at?: string
+          status: string
+          user_id: string
+        }
+        Update: {
+          finished_at?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      competitor_summaries: {
+        Row: {
+          company_url: string
+          competitor_id: string | null
+          competitor_name: string
+          created_at: string
+          id: string
+          source_urls: Json
+          summary: string
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          company_url: string
+          competitor_id?: string | null
+          competitor_name: string
+          created_at?: string
+          id?: string
+          source_urls?: Json
+          summary?: string
+          user_id: string
+          week_start: string
+        }
+        Update: {
+          company_url?: string
+          competitor_id?: string | null
+          competitor_name?: string
+          created_at?: string
+          id?: string
+          source_urls?: Json
+          summary?: string
+          user_id?: string
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_summaries_competitor_id_fkey"
+            columns: ["competitor_id"]
+            isOneToOne: false
+            referencedRelation: "competitors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       competitors: {
         Row: {
           company_url: string | null
