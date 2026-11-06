@@ -16,3 +16,5 @@
 - Keep the Exa call-path guard in CI and security regression tests to prevent new client or alternate resolver paths.
 - Pricing provider calls live only in `src/server/pricing/extract-peer-prices.ts`, dynamically imported by the authenticated pricing POST handler; browser-safe parsing and series helpers live in `src/lib/peer-pricing.ts` so UI never imports provider code.
 - Peer-pricing SQL is provided for manual execution in `docs/peer-prices.sql`; history is append-only and charts separate currencies to avoid treating incomparable prices as one series.
+- Daily brief generation lives in a server-only module dynamically imported by its verified API handler; browser-safe schemas and pricing comparisons live in a separate utility to prevent provider code reaching the UI.
+- Brief regeneration inserts with conflict-ignore then updates only generated fields, never pinned; column-scoped SQL grants keep user edits limited to pinning and preserve concurrent pin changes.
