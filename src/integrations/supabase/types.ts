@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      briefs: {
+        Row: {
+          action_plan: string
+          body: string
+          created_at: string
+          day: string
+          highlights: Json
+          id: string
+          model: string | null
+          pinned: boolean
+          title: string
+          user_id: string
+        }
+        Insert: {
+          action_plan: string
+          body: string
+          created_at?: string
+          day: string
+          highlights?: Json
+          id?: string
+          model?: string | null
+          pinned?: boolean
+          title: string
+          user_id: string
+        }
+        Update: {
+          action_plan?: string
+          body?: string
+          created_at?: string
+          day?: string
+          highlights?: Json
+          id?: string
+          model?: string | null
+          pinned?: boolean
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       competitor_activity: {
         Row: {
           category: string
