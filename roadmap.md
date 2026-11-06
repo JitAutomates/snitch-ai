@@ -1,4 +1,6 @@
 # Current task
+- [ ] Implement saved daily briefs, owner-only pinning SQL, DB-only generation API, history UI and regression tests.
+- [ ] Verify daily briefs; external Supabase signed-in checks and SQL execution require user action.
 - [ ] Add peer-pricing SQL for user execution, website-only extractor, authenticated refresh, onboarding trigger and real chart.
 - [ ] Verify pricing boundaries, plan selection, route registration and read-only chart; report SQL/credential blockers.
 - [ ] Enforce exclusive Exa resolver path, JWT/cron authentication, and server-only secrets.
