@@ -15,7 +15,9 @@ const str = (max: number) =>
 
 const strList = z
   .union([z.array(z.string()), z.null(), z.undefined()])
-  .transform((v) => (Array.isArray(v) ? v.filter((u) => typeof u === "string") : []));
+  .transform((v) =>
+    Array.isArray(v) ? v.filter((u) => typeof u === "string") : [],
+  );
 
 const News = z.object({
   day: z.string(),
@@ -50,27 +52,24 @@ const Profile = z.object({
   scale: str(100).nullable().optional(),
 });
 
+/** Free models often wrap JSON in fences or prose; take the outermost object. */
 function extractJsonObject(raw: string): unknown {
-  const trimmed = raw.trim();
+  let text = raw.trim();
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence?.[1]) text = fence[1].trim();
+
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) {
+    throw new Error("Brief LLM returned invalid JSON");
+  }
+  text = text.slice(start, end + 1).replace(/,\s*([}\]])/g, "$1");
+
   try {
-    return JSON.parse(trimmed);
+    return JSON.parse(text);
   } catch {
-    /* continue */
+    throw new Error("Brief LLM returned invalid JSON");
   }
-  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fence?.[1]) {
-    try {
-      return JSON.parse(fence[1].trim());
-    } catch {
-      /* continue */
-    }
-  }
-  const start = trimmed.indexOf("{");
-  const end = trimmed.lastIndexOf("}");
-  if (start >= 0 && end > start) {
-    return JSON.parse(trimmed.slice(start, end + 1));
-  }
-  throw new Error("Brief LLM returned invalid JSON");
 }
 
 export const generateDailyBrief = createServerOnlyFn(
@@ -98,51 +97,56 @@ export const generateDailyBrief = createServerOnlyFn(
       new Date(at - days * 86400000).toISOString();
     const until = new Date(at + 86400000).toISOString();
 
-    const [profileResult, newsResult, priceResult, activityResult, summaryResult] =
-      await Promise.all([
-        db
-          .from("profiles")
-          .select("industry, product, region, scale")
-          .eq("id", userId)
-          .maybeSingle(),
-        db
-          .from("niche_news")
-          .select("day, tag, headline, body, source_urls")
-          .eq("user_id", userId)
-          .gte("day", since(7).slice(0, 10))
-          .lte("day", day)
-          .order("day", { ascending: false })
-          .limit(12),
-        db
-          .from("peer_prices")
-          .select(
-            "competitor_id, competitor_name, amount, amount_display, currency, plan_label, observed_at, source_url",
-          )
-          .eq("user_id", userId)
-          .gte("observed_at", since(30))
-          .lt("observed_at", until)
-          .order("observed_at", { ascending: false })
-          .limit(30),
-        db
-          .from("competitor_activity")
-          .select(
-            "category, headline, summary, source_url, competitor_name, published_at, created_at",
-          )
-          .eq("user_id", userId)
-          .gte("created_at", since(14))
-          .lt("created_at", until)
-          .order("created_at", { ascending: false })
-          .limit(20),
-        db
-          .from("competitor_summaries")
-          .select(
-            "competitor_id, competitor_name, week_start, summary, source_urls",
-          )
-          .eq("user_id", userId)
-          .lte("week_start", day)
-          .order("week_start", { ascending: false })
-          .limit(30),
-      ]);
+    const [
+      profileResult,
+      newsResult,
+      priceResult,
+      activityResult,
+      summaryResult,
+    ] = await Promise.all([
+      db
+        .from("profiles")
+        .select("industry, product, region, scale")
+        .eq("id", userId)
+        .maybeSingle(),
+      db
+        .from("niche_news")
+        .select("day, tag, headline, body, source_urls")
+        .eq("user_id", userId)
+        .gte("day", since(7).slice(0, 10))
+        .lte("day", day)
+        .order("day", { ascending: false })
+        .limit(12),
+      db
+        .from("peer_prices")
+        .select(
+          "competitor_id, competitor_name, amount, amount_display, currency, plan_label, observed_at, source_url",
+        )
+        .eq("user_id", userId)
+        .gte("observed_at", since(30))
+        .lt("observed_at", until)
+        .order("observed_at", { ascending: false })
+        .limit(30),
+      db
+        .from("competitor_activity")
+        .select(
+          "category, headline, summary, source_url, competitor_name, published_at, created_at",
+        )
+        .eq("user_id", userId)
+        .gte("created_at", since(14))
+        .lt("created_at", until)
+        .order("created_at", { ascending: false })
+        .limit(20),
+      db
+        .from("competitor_summaries")
+        .select(
+          "competitor_id, competitor_name, week_start, summary, source_urls",
+        )
+        .eq("user_id", userId)
+        .lte("week_start", day)
+        .order("week_start", { ascending: false })
+        .limit(30),
+    ]);
 
     if (profileResult.error) {
       throw new Error(`Could not load profile: ${profileResult.error.message}`);
@@ -151,14 +155,15 @@ export const generateDailyBrief = createServerOnlyFn(
       throw new Error(`Could not load niche_news: ${newsResult.error.message}`);
     }
     if (priceResult.error) {
-      throw new Error(`Could not load peer_prices: ${priceResult.error.message}`);
+      throw new Error(
+        `Could not load peer_prices: ${priceResult.error.message}`,
+      );
     }
     if (activityResult.error) {
       throw new Error(
         `Could not load competitor_activity: ${activityResult.error.message}`,
       );
     }
-    // Optional table / missing is OK
     if (
       summaryResult.error &&
       !["42P01", "PGRST205"].includes(summaryResult.error.code ?? "")
@@ -238,7 +243,7 @@ export const generateDailyBrief = createServerOnlyFn(
       {
         role: "system" as const,
         content:
-          'Output ONLY valid JSON: {"title":string,"body":string,"action_plan":string,"highlights":[{"type":"news"|"pricing"|"activity"|"other","title":string,"detail":string}]}. Body: 2–4 short plain-text paragraphs. action_plan: 3–6 concrete imperative to-dos, newline-separated. Tone: practical, calm Hong Kong startup founder, no hype. Use ONLY supplied context. Never invent competitors, prices, events or headlines. Explicitly say when news, prices or activity has no data. Pricing moves only from priceChanges. Prefer what changed and what to do this week.',
+          'Output ONLY valid JSON: {"title":string,"body":string,"action_plan":string,"highlights":[{"type":"news"|"pricing"|"activity"|"other","title":string,"detail":string}]}. Body: 2–4 short plain-text paragraphs. action_plan: 3–6 concrete imperative to-dos, newline-separated. Tone: practical, calm Hong Kong startup founder, no hype. Use ONLY supplied context. Never invent competitors, prices, events or headlines. Explicitly say when news, prices or activity has no data. Pricing moves only from priceChanges. Prefer what changed and what to do this week. Return a single JSON object only. No markdown. No code fences. No text before or after the object.',
       },
       { role: "user" as const, content: JSON.stringify(context) },
     ];
@@ -266,12 +271,33 @@ export const generateDailyBrief = createServerOnlyFn(
     }
 
     const reply = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string | null } }>;
+      choices?: Array<{
+        message?: { content?: string | null; refusal?: string | null };
+      }>;
     };
-    const content = reply.choices?.[0]?.message?.content;
-    if (!content) throw new Error("Brief LLM returned no content");
+    const choice = reply.choices?.[0]?.message;
+    const content = choice?.content;
+    if (!content) {
+      const refusal =
+        typeof choice?.refusal === "string" ? choice.refusal : null;
+      throw new Error(
+        refusal
+          ? `Brief LLM refused: ${refusal.slice(0, 160)}`
+          : "Brief LLM returned no content (set LLM_MODEL to a specific working model)",
+      );
+    }
 
-    const generated = GeneratedBrief.parse(extractJsonObject(content));
+    let generated: z.infer<typeof GeneratedBrief>;
+    try {
+      generated = GeneratedBrief.parse(extractJsonObject(content));
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("invalid JSON")) throw e;
+      throw new Error(
+        `Brief LLM JSON shape invalid: ${
+          e instanceof Error ? e.message.slice(0, 160) : "schema"
+        }`,
+      );
+    }
 
     const allSources = [
       ...new Set(
@@ -300,7 +326,6 @@ export const generateDailyBrief = createServerOnlyFn(
       model,
     };
 
-    // Upsert content; never touch pinned
     const { error: upsertError } = await db.from("briefs").upsert(
       { user_id: userId, day, ...fields, pinned: false },
       { onConflict: "user_id,day" },
@@ -309,8 +334,6 @@ export const generateDailyBrief = createServerOnlyFn(
       throw new Error(`Could not save daily brief: ${upsertError.message}`);
     }
 
-    // Restore pin if it was set before (upsert may have reset default)
-    // Prefer update-only path when row exists with pin — simple re-read:
     const saved = await db
       .from("briefs")
       .update(fields)
@@ -325,7 +348,6 @@ export const generateDailyBrief = createServerOnlyFn(
       throw new Error(`Could not save daily brief: ${saved.error.message}`);
     }
 
-    // day may come back as date; normalize for zod
     const row = {
       ...saved.data,
       day:
