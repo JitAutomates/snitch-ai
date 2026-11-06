@@ -74,8 +74,15 @@ function Briefs() {
       const response = await fetch("/api/briefs/generate", { method: "POST", headers: {
         "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}`,
       }, body: JSON.stringify({ reason: "manual" }) });
-      if (!response.ok) throw new Error("Could not generate your brief. Try again after checking the briefs setup.");
-      const result = z.object({ brief: BriefRow }).parse(await response.json());
+      const payload = await response.json().catch(() => ({} as Record<string, unknown>));
+      if (!response.ok) {
+        const apiError =
+          typeof payload.error === "string" && payload.error.length > 0
+          ? payload.error
+          : `Could not generate (${response.status})`;
+  throw new Error(apiError);
+}
+const result = z.object({ brief: BriefRow }).parse(payload);
       setSelected(result.brief.day);
       setHistory(h => [result.brief, ...h.filter(b => b.id !== result.brief.id)].sort((a, b) => b.day.localeCompare(a.day)));
       await loadBriefs();
