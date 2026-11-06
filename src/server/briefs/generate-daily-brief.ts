@@ -248,7 +248,7 @@ export const generateDailyBrief = createServerOnlyFn(
       { role: "user" as const, content: JSON.stringify(context) },
     ];
 
-    const chat = (jsonFormat: boolean) =>
+        const chat = (jsonFormat: boolean) =>
       fetch(`${base}/chat/completions`, {
         method: "POST",
         headers,
@@ -261,42 +261,58 @@ export const generateDailyBrief = createServerOnlyFn(
         }),
       });
 
-    let response = await chat(true);
-    if (response.status === 400) response = await chat(false);
-    if (!response.ok) {
-      const detail = (await response.text().catch(() => "")).slice(0, 120);
-      throw new Error(
-        `Brief LLM request failed (${response.status})${detail ? `: ${detail}` : ""}`,
-      );
+    const MAX_LLM_ATTEMPTS = 3;
+    let generated: z.infer<typeof GeneratedBrief> | null = null;
+    let lastError = "Brief LLM failed";
+
+    for (let attempt = 1; attempt <= MAX_LLM_ATTEMPTS; attempt++) {
+      try {
+        let response = await chat(true);
+        if (response.status === 400) response = await chat(false);
+        if (!response.ok) {
+          const detail = (await response.text().catch(() => "")).slice(0, 120);
+          throw new Error(
+            `Brief LLM request failed (${response.status})${detail ? `: ${detail}` : ""}`,
+          );
+        }
+
+        const reply = (await response.json()) as {
+          choices?: Array<{
+            message?: { content?: string | null; refusal?: string | null };
+          }>;
+        };
+        const choice = reply.choices?.[0]?.message;
+        const content = choice?.content;
+        if (!content) {
+          const refusal =
+            typeof choice?.refusal === "string" ? choice.refusal : null;
+          throw new Error(
+            refusal
+              ? `Brief LLM refused: ${refusal.slice(0, 160)}`
+              : "Brief LLM returned no content",
+          );
+        }
+
+        generated = GeneratedBrief.parse(extractJsonObject(content));
+        break; // success
+      } catch (e) {
+        lastError =
+          e instanceof Error ? e.message.slice(0, 200) : "Brief LLM failed";
+        // Retry only empty content / bad JSON / schema — not auth or missing key
+        const retryable =
+          /no content|invalid JSON|JSON shape invalid|refused|request failed \(5\d\d\)|request failed \(429\)/i.test(
+            lastError,
+          );
+        if (!retryable || attempt === MAX_LLM_ATTEMPTS) {
+          throw new Error(lastError);
+        }
+        // Brief backoff before next attempt
+        await new Promise((r) => setTimeout(r, 400 * attempt));
+      }
     }
 
-    const reply = (await response.json()) as {
-      choices?: Array<{
-        message?: { content?: string | null; refusal?: string | null };
-      }>;
-    };
-    const choice = reply.choices?.[0]?.message;
-    const content = choice?.content;
-    if (!content) {
-      const refusal =
-        typeof choice?.refusal === "string" ? choice.refusal : null;
-      throw new Error(
-        refusal
-          ? `Brief LLM refused: ${refusal.slice(0, 160)}`
-          : "Brief LLM returned no content (set LLM_MODEL to a specific working model)",
-      );
-    }
-
-    let generated: z.infer<typeof GeneratedBrief>;
-    try {
-      generated = GeneratedBrief.parse(extractJsonObject(content));
-    } catch (e) {
-      if (e instanceof Error && e.message.includes("invalid JSON")) throw e;
-      throw new Error(
-        `Brief LLM JSON shape invalid: ${
-          e instanceof Error ? e.message.slice(0, 160) : "schema"
-        }`,
-      );
+    if (!generated) {
+      throw new Error(lastError);
     }
 
     const allSources = [
