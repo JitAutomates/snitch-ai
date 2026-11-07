@@ -65,6 +65,7 @@ type CompetitorAlert = {
 };
 
 function Monitors() {
+  const { premium, loading: planLoading } = usePlan();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [dayOffset, setDayOffset] = useState(0); // 0 = today, 49 = 49 days ago
