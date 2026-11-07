@@ -1,4 +1,5 @@
 # Current task
+- [x] Add Free-plan blur for news, pricing and brief history; regeneration and Billing destinations verified with plan interaction tests. Hosted signed-in checks unavailable for external Supabase.
 - [x] Fix current build blockers; automatic build passes, all 25 brief/routing checks pass, and public pages open without errors.
 - [ ] Resolve the existing pricing regression mismatch: its test expects daily processing to stop on failure, while the handler continues; outside the build-fix scope.
 - [ ] Implement saved daily briefs, owner-only pinning SQL, DB-only generation API, history UI and regression tests.

@@ -18,3 +18,4 @@
 - Peer-pricing SQL is provided for manual execution in `docs/peer-prices.sql`; history is append-only and charts separate currencies to avoid treating incomparable prices as one series.
 - Daily brief generation lives in a server-only module dynamically imported by its verified API handler; browser-safe schemas and pricing comparisons live in a separate utility to prevent provider code reaching the UI.
 - Brief regeneration inserts with conflict-ignore then updates only generated fields, never pinned; column-scoped SQL grants keep user edits limited to pinning and preserve concurrent pin changes.
+- Plan-gated presentation uses the shared PlanBlur wrapper and browser-safe planDisplayAccess helper; inert content and a Billing link prevent interacting with blurred controls without changing data authorization.

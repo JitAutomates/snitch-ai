@@ -23,6 +23,8 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { usePlan } from "@/hooks/use-plan";
+import { planDisplayAccess } from "@/lib/plan";
+import { PlanBlur } from "@/components/plan-blur";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -67,6 +69,7 @@ type CompetitorAlert = {
 
 function Monitors() {
   const { premium, loading: planLoading } = usePlan();
+  const access = planDisplayAccess(premium, planLoading);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [dayOffset, setDayOffset] = useState(0); // 0 = today, 49 = 49 days ago
@@ -334,6 +337,7 @@ function Monitors() {
 
             {/* Newspaper niche news */}
             <section>
+              <PlanBlur locked={access.monitorsBlurred} loading={planLoading} label="niche news">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg tracking-tight">Niche news</h2>
                 <div className="flex items-center gap-2">
@@ -417,11 +421,13 @@ function Monitors() {
                   </p>
                 </article>
               )}
+              </PlanBlur>
             </section>
 
             {/* Pricing line chart */}
             <section>
               <h2 className="mb-1 text-lg tracking-tight">Peer pricing</h2>
+              <PlanBlur locked={access.monitorsBlurred} loading={planLoading} label="peer pricing">
               <p className="mb-4 text-sm text-muted-foreground">
                 Entry/list prices from competitor websites (peers only). Not live checkout quotes.
               </p>
@@ -490,6 +496,7 @@ function Monitors() {
                 </ul>
               </div>
               )}
+              </PlanBlur>
             </section>
           </div>
         </main>

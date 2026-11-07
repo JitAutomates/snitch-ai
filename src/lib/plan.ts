@@ -7,6 +7,15 @@ export function isPremium(plan: Plan | string | null | undefined): boolean {
   return plan === "premium";
 }
 
+export function planDisplayAccess(premium: boolean, loading = false) {
+  const unlocked = premium && !loading;
+  return {
+    monitorsBlurred: !unlocked,
+    briefHistoryBlurred: !unlocked,
+    canRegenerateBrief: unlocked,
+  };
+}
+
 /** Free: list peers, no deep competitor monitor. */
 export const FREE_PEER_DETAIL_LOCKED = true;
 
