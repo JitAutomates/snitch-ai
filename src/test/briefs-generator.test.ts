@@ -10,11 +10,11 @@ const saved = { id, user_id: id, day: "2026-11-06", ...output, pinned: true, mod
 function builder(table: string) {
   const chain: Record<string, unknown> = {};
   for (const method of ["select", "eq", "gte", "lte", "lt", "order"]) chain[method] = (...args: unknown[]) => { mocks.filters(table, method, ...args); return chain; };
-  chain.limit = (value: number) => { mocks.limits(table, value); return Promise.resolve({ data: [], error: null }); };
-  chain.maybeSingle = () => Promise.resolve({ data: null, error: null });
-  chain.upsert = mocks.upsert;
-  chain.update = (fields: unknown) => { mocks.update(fields); return chain; };
-  chain.single = () => Promise.resolve({ data: saved, error: null });
+  chain["limit"] = (value: number) => { mocks.limits(table, value); return Promise.resolve({ data: [], error: null }); };
+  chain["maybeSingle"] = () => Promise.resolve({ data: null, error: null });
+  chain["upsert"] = mocks.upsert;
+  chain["update"] = (fields: unknown) => { mocks.update(fields); return chain; };
+  chain["single"] = () => Promise.resolve({ data: saved, error: null });
   return chain;
 }
 beforeEach(() => {
@@ -54,9 +54,16 @@ describe("DB-only brief generation", () => {
     await expect(generateDailyBrief(id, "2026-11-06")).rejects.toThrow();
     expect(mocks.upsert).not.toHaveBeenCalled();
   });
+  it("retries malformed model output before saving a valid brief", async () => {
+    mocks.fetch.mockResolvedValueOnce(Response.json({ choices: [{ message: { content: '{"title":"incomplete"}' } }] }));
+    const result = await generateDailyBrief(id, "2026-11-06");
+    expect(mocks.fetch).toHaveBeenCalledTimes(2);
+    expect(result.brief.title).toBe("No collected updates");
+    expect(mocks.upsert).toHaveBeenCalledTimes(1);
+  });
   it("does not treat database errors as empty input", async () => {
     mocks.from.mockImplementation(table => table === "niche_news" ? { select: () => ({ eq: () => ({ gte: () => ({ lte: () => ({ order: () => ({ limit: () => Promise.resolve({ error: { code: "42501" }, data: null }) }) }) }) }) }) } : builder(table));
-    await expect(generateDailyBrief(id, "2026-11-06")).rejects.toThrow("Could not load daily brief inputs");
+    await expect(generateDailyBrief(id, "2026-11-06")).rejects.toThrow("Could not load niche_news");
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
 });

@@ -293,7 +293,9 @@ export const generateDailyBrief = createServerOnlyFn(
           );
         }
 
-        generated = GeneratedBrief.parse(extractJsonObject(content));
+        const parsedBrief = GeneratedBrief.safeParse(extractJsonObject(content));
+        if (!parsedBrief.success) throw new Error("Brief LLM JSON shape invalid");
+        generated = parsedBrief.data;
         break; // success
       } catch (e) {
         lastError =
@@ -343,8 +345,8 @@ export const generateDailyBrief = createServerOnlyFn(
     };
 
     const { error: upsertError } = await db.from("briefs").upsert(
-      { user_id: userId, day, ...fields, pinned: false },
-      { onConflict: "user_id,day" },
+      { user_id: userId, day, ...fields },
+      { onConflict: "user_id,day", ignoreDuplicates: true },
     );
     if (upsertError) {
       throw new Error(`Could not save daily brief: ${upsertError.message}`);

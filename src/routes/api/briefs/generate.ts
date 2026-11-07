@@ -50,12 +50,10 @@ async function post({ request }: { request: Request }) {
     if (error || !data.user) return json({ error: "Unauthorized" }, 401);
     const { generateDailyBrief } = await import("@/server/briefs/generate-daily-brief");
     return json({ ok: true, ...(await generateDailyBrief(data.user.id, day)) });
-   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Could not generate daily brief";
+   } catch {
     return json(
       {
-        error: message.slice(0, 300),
+        error: "Could not generate daily brief",
         hint: "Check LLM_API_KEY, briefs table, and input tables (niche_news, peer_prices, competitor_activity).",
       },
       502,

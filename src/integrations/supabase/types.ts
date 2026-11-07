@@ -316,6 +316,9 @@ export type Database = {
           onboarded: boolean
           peers_resolve_status: string | null
           peers_resolved_at: string | null
+          plan: string
+          plan_renews_at: string | null
+          plan_updated_at: string | null
           product: string | null
           region: string | null
           sales_volume: number | null
@@ -331,6 +334,9 @@ export type Database = {
           onboarded?: boolean
           peers_resolve_status?: string | null
           peers_resolved_at?: string | null
+          plan?: string
+          plan_renews_at?: string | null
+          plan_updated_at?: string | null
           product?: string | null
           region?: string | null
           sales_volume?: number | null
@@ -346,6 +352,9 @@ export type Database = {
           onboarded?: boolean
           peers_resolve_status?: string | null
           peers_resolved_at?: string | null
+          plan?: string
+          plan_renews_at?: string | null
+          plan_updated_at?: string | null
           product?: string | null
           region?: string | null
           sales_volume?: number | null
