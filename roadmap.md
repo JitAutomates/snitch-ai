@@ -1,5 +1,6 @@
 # Current task
-- [ ] Fix the current build blockers and verify compilation signals and regression tests.
+- [x] Fix current build blockers; automatic build passes, all 25 brief/routing checks pass, and public pages open without errors.
+- [ ] Resolve the existing pricing regression mismatch: its test expects daily processing to stop on failure, while the handler continues; outside the build-fix scope.
 - [ ] Implement saved daily briefs, owner-only pinning SQL, DB-only generation API, history UI and regression tests.
 - [ ] Verify daily briefs; external Supabase signed-in checks and SQL execution require user action.
 - [ ] Add peer-pricing SQL for user execution, website-only extractor, authenticated refresh, onboarding trigger and real chart.
