@@ -10,11 +10,11 @@ const saved = { id, user_id: id, day: "2026-11-06", ...output, pinned: true, mod
 function builder(table: string) {
   const chain: Record<string, unknown> = {};
   for (const method of ["select", "eq", "gte", "lte", "lt", "order"]) chain[method] = (...args: unknown[]) => { mocks.filters(table, method, ...args); return chain; };
-  chain.limit = (value: number) => { mocks.limits(table, value); return Promise.resolve({ data: [], error: null }); };
-  chain.maybeSingle = () => Promise.resolve({ data: null, error: null });
-  chain.upsert = mocks.upsert;
-  chain.update = (fields: unknown) => { mocks.update(fields); return chain; };
-  chain.single = () => Promise.resolve({ data: saved, error: null });
+  chain["limit"] = (value: number) => { mocks.limits(table, value); return Promise.resolve({ data: [], error: null }); };
+  chain["maybeSingle"] = () => Promise.resolve({ data: null, error: null });
+  chain["upsert"] = mocks.upsert;
+  chain["update"] = (fields: unknown) => { mocks.update(fields); return chain; };
+  chain["single"] = () => Promise.resolve({ data: saved, error: null });
   return chain;
 }
 beforeEach(() => {

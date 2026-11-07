@@ -22,6 +22,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
+import { usePlan } from "@/hooks/use-plan";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
