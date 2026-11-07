@@ -294,7 +294,13 @@ function Monitors() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => navigate({ to: "/competitor-monitor" as never })}
+                  onClick={() => {
+                    if (!premium) {
+                      navigate({ to: "/billing" as never });
+                      return;
+                    }
+  navigate({ to: "/competitor-monitor" as never });
+}}
                   className="w-full rounded-2xl border border-amber-500/30 bg-card p-5 text-left transition-colors hover:border-amber-500/50"
                 >
                   <div className="flex items-start gap-3">
