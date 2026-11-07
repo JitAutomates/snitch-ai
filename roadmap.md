@@ -1,4 +1,5 @@
 # Current task
+- [ ] Fix the current build blockers and verify compilation signals and regression tests.
 - [ ] Implement saved daily briefs, owner-only pinning SQL, DB-only generation API, history UI and regression tests.
 - [ ] Verify daily briefs; external Supabase signed-in checks and SQL execution require user action.
 - [ ] Add peer-pricing SQL for user execution, website-only extractor, authenticated refresh, onboarding trigger and real chart.

@@ -56,7 +56,7 @@ describe("DB-only brief generation", () => {
   });
   it("does not treat database errors as empty input", async () => {
     mocks.from.mockImplementation(table => table === "niche_news" ? { select: () => ({ eq: () => ({ gte: () => ({ lte: () => ({ order: () => ({ limit: () => Promise.resolve({ error: { code: "42501" }, data: null }) }) }) }) }) }) } : builder(table));
-    await expect(generateDailyBrief(id, "2026-11-06")).rejects.toThrow("Could not load daily brief inputs");
+    await expect(generateDailyBrief(id, "2026-11-06")).rejects.toThrow("Could not load niche_news");
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
 });

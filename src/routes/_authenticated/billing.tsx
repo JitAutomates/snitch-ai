@@ -295,3 +295,51 @@ function Billing() {
                           {renewsAt && (
                             <p className="mt-1 text-xs text-muted-foreground">
                               {new Date(renewsAt).toLocaleString("en-HK", {
+                                dateStyle: "medium",
+                                timeStyle: "short",
+                              })}
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          variant="secondary"
+                          className="w-full"
+                          disabled={busy}
+                          onClick={cancelSubscription}
+                        >
+                          Cancel subscription
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full"
+                          onClick={requestRefund}
+                        >
+                          Request refund
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          className="w-full"
+                          disabled={busy}
+                          onClick={activatePremiumDemo}
+                        >
+                          {busy ? "Activating…" : "Activate Premium (demo)"}
+                        </Button>
+                        <p className="text-center text-xs text-muted-foreground">
+                          Demo only. No payment is collected. Live payments are Pro only.
+                          Premium is HK$80 per month or HK$700 per year, renewing
+                          automatically until cancelled.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
