@@ -54,6 +54,13 @@ describe("DB-only brief generation", () => {
     await expect(generateDailyBrief(id, "2026-11-06")).rejects.toThrow();
     expect(mocks.upsert).not.toHaveBeenCalled();
   });
+  it("retries malformed model output before saving a valid brief", async () => {
+    mocks.fetch.mockResolvedValueOnce(Response.json({ choices: [{ message: { content: '{"title":"incomplete"}' } }] }));
+    const result = await generateDailyBrief(id, "2026-11-06");
+    expect(mocks.fetch).toHaveBeenCalledTimes(2);
+    expect(result.brief.title).toBe("No collected updates");
+    expect(mocks.upsert).toHaveBeenCalledTimes(1);
+  });
   it("does not treat database errors as empty input", async () => {
     mocks.from.mockImplementation(table => table === "niche_news" ? { select: () => ({ eq: () => ({ gte: () => ({ lte: () => ({ order: () => ({ limit: () => Promise.resolve({ error: { code: "42501" }, data: null }) }) }) }) }) }) } : builder(table));
     await expect(generateDailyBrief(id, "2026-11-06")).rejects.toThrow("Could not load niche_news");
