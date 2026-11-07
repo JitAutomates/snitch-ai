@@ -40,8 +40,6 @@ const NAV = [
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
-const STORAGE_KEY = "snitch_premium";
-
 type PremiumState = {
   active: boolean;
   /** ISO date of next charge */
@@ -66,21 +64,37 @@ const PREMIUM_FEATURES = [
   "Email delivery of daily brief",
 ];
 
-function loadPremium(): PremiumState | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as PremiumState;
-    if (!parsed?.active || !parsed.nextPaymentAt) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
+async function activatePremiumDemo() {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return;
+  const renews = new Date(Date.now() + 30 * 86400000).toISOString();
+  await (supabase as SupabaseClient)
+    .from("profiles")
+    .update({
+      plan: "premium",
+      plan_updated_at: new Date().toISOString(),
+      plan_renews_at: renews,
+    })
+    .eq("id", auth.user.id);
+  await reload();
+  toast.success("Premium activated (demo).");
 }
 
-function savePremium(state: PremiumState | null) {
-  if (!state) localStorage.removeItem(STORAGE_KEY);
-  else localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+async function cancelSubscription() {
+  const ok = window.confirm("Cancel Premium? You will return to Free immediately (demo).");
+  if (!ok) return;
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return;
+  await (supabase as SupabaseClient)
+    .from("profiles")
+    .update({
+      plan: "free",
+      plan_updated_at: new Date().toISOString(),
+      plan_renews_at: null,
+    })
+    .eq("id", auth.user.id);
+  await reload();
+  toast.success("Back on Free.");
 }
 
 function formatCountdown(targetIso: string, now: number): string {
