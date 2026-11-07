@@ -293,7 +293,9 @@ export const generateDailyBrief = createServerOnlyFn(
           );
         }
 
-        generated = GeneratedBrief.parse(extractJsonObject(content));
+        const parsedBrief = GeneratedBrief.safeParse(extractJsonObject(content));
+        if (!parsedBrief.success) throw new Error("Brief LLM JSON shape invalid");
+        generated = parsedBrief.data;
         break; // success
       } catch (e) {
         lastError =
