@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   LayoutDashboard,
   Radar,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { usePlan } from "@/hooks/use-plan";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -24,7 +26,10 @@ export const Route = createFileRoute("/_authenticated/billing")({
         content: "Free and Premium plans for Hong Kong startup founders.",
       },
       { property: "og:title", content: "Billing | Snitch" },
-      { property: "og:description", content: "Free and Premium plans for Hong Kong startup founders." },
+      {
+        property: "og:description",
+        content: "Free and Premium plans for Hong Kong startup founders.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -40,62 +45,22 @@ const NAV = [
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
-type PremiumState = {
-  active: boolean;
-  /** ISO date of next charge */
-  nextPaymentAt: string;
-};
-
 const FREE_FEATURES = [
-  "1 active monitor",
-  "Weekly brief only",
-  "7-day brief history",
-  "Basic competitor alerts",
-  "HK niche news (limited)",
+  "Top 10 competitor names",
+  "No competitor detail pages",
+  "Monitors preview (blurred)",
+  "No brief regenerate",
+  "Upgrade anytime",
 ];
 
 const PREMIUM_FEATURES = [
-  "3 active monitors",
-  "Daily briefs",
-  "2-month brief history",
-  "Priority competitor alerts",
-  "Full peer pricing band (±50%)",
-  "Pinned briefs & unfinished business",
-  "Email delivery of daily brief",
+  "Full competitor monitor detail",
+  "Unblurred niche news & peer pricing",
+  "Daily brief generate & regenerate",
+  "Pinned briefs & history",
+  "Priority alerts",
+  "Full peer pricing band",
 ];
-
-async function activatePremiumDemo() {
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return;
-  const renews = new Date(Date.now() + 30 * 86400000).toISOString();
-  await (supabase as SupabaseClient)
-    .from("profiles")
-    .update({
-      plan: "premium",
-      plan_updated_at: new Date().toISOString(),
-      plan_renews_at: renews,
-    })
-    .eq("id", auth.user.id);
-  await reload();
-  toast.success("Premium activated (demo).");
-}
-
-async function cancelSubscription() {
-  const ok = window.confirm("Cancel Premium? You will return to Free immediately (demo).");
-  if (!ok) return;
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return;
-  await (supabase as SupabaseClient)
-    .from("profiles")
-    .update({
-      plan: "free",
-      plan_updated_at: new Date().toISOString(),
-      plan_renews_at: null,
-    })
-    .eq("id", auth.user.id);
-  await reload();
-  toast.success("Back on Free.");
-}
 
 function formatCountdown(targetIso: string, now: number): string {
   const ms = new Date(targetIso).getTime() - now;
@@ -112,23 +77,20 @@ function formatCountdown(targetIso: string, now: number): string {
 function Billing() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [premium, setPremium] = useState<PremiumState | null>(null);
+  const { premium, renewsAt, loading, reload } = usePlan();
   const [now, setNow] = useState(() => Date.now());
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    setPremium(loadPremium());
-  }, []);
-
-  useEffect(() => {
-    if (!premium?.active) return;
+    if (!premium || !renewsAt) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [premium?.active]);
+  }, [premium, renewsAt]);
 
   const countdown = useMemo(() => {
-    if (!premium?.nextPaymentAt) return "";
-    return formatCountdown(premium.nextPaymentAt, now);
-  }, [premium?.nextPaymentAt, now]);
+    if (!renewsAt) return "";
+    return formatCountdown(renewsAt, now);
+  }, [renewsAt, now]);
 
   async function signOut() {
     await queryClient.cancelQueries();
@@ -137,14 +99,60 @@ function Billing() {
     navigate({ to: "/auth", replace: true });
   }
 
-  function cancelSubscription() {
+  async function activatePremiumDemo() {
+    setBusy(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) {
+        toast.error("Sign in to upgrade.");
+        return;
+      }
+      const renews = new Date(Date.now() + 30 * 86400000).toISOString();
+      const { error } = await (supabase as SupabaseClient)
+        .from("profiles")
+        .update({
+          plan: "premium",
+          plan_updated_at: new Date().toISOString(),
+          plan_renews_at: renews,
+        })
+        .eq("id", auth.user.id);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      await reload();
+      toast.success("Premium activated (demo).");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function cancelSubscription() {
     const ok = window.confirm(
-      "Cancel Premium? Access continues until the end of the current period. This is a local demo until payments are connected.",
+      "Cancel Premium? You will return to Free immediately (demo).",
     );
     if (!ok) return;
-    savePremium(null);
-    setPremium(null);
-    toast.success("Subscription cancelled (demo).");
+    setBusy(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      const { error } = await (supabase as SupabaseClient)
+        .from("profiles")
+        .update({
+          plan: "free",
+          plan_updated_at: new Date().toISOString(),
+          plan_renews_at: null,
+        })
+        .eq("id", auth.user.id);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      await reload();
+      toast.success("Back on Free.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function requestRefund() {
@@ -208,125 +216,82 @@ function Billing() {
               </p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              {/* Free — plain, blends with page */}
-              <div className="flex flex-col rounded-2xl border border-transparent bg-background p-6 md:p-8">
-                <p className="text-sm text-muted-foreground">Free</p>
-                <p className="mt-2 text-3xl tracking-tight">HK$0</p>
-                <p className="mt-1 text-sm text-muted-foreground">Forever</p>
-                <ul className="mt-8 flex-1 space-y-3">
-                  {FREE_FEATURES.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 opacity-50" />
-                      <span>{f}</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-8 text-center text-xs text-muted-foreground">
-                  {premium?.active ? "Your account is on Premium" : "Current plan"}
-                </p>
-              </div>
-
-              {/* Premium — gold + sparkle */}
-              <div
-                className={cn(
-                  "relative flex flex-col overflow-hidden rounded-2xl border border-[#d4af37]/70 bg-card p-6 md:p-8 snitch-gold-glow",
-                )}
-              >
-                <Sparkles
-                  className="pointer-events-none absolute right-5 top-5 h-5 w-5 text-[#d4af37] snitch-sparkle"
-                  aria-hidden
-                />
-                <Sparkles
-                  className="pointer-events-none absolute bottom-8 left-6 h-4 w-4 text-[#d4af37]/80 snitch-sparkle snitch-sparkle-delay"
-                  aria-hidden
-                />
-
-                <div className="flex items-center gap-2">
-                  <p className="text-sm text-[#d4af37]">Premium</p>
-                  <span className="rounded-full border border-[#d4af37]/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-[#d4af37]">
-                    Recommended
-                  </span>
+            {loading ? (
+              <p className="text-sm text-muted-foreground">Loading plan…</p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {/* Free */}
+                <div className="flex flex-col rounded-2xl border border-transparent bg-background p-6 md:p-8">
+                  <p className="text-sm text-muted-foreground">Free</p>
+                  <p className="mt-2 text-3xl tracking-tight">HK$0</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Forever</p>
+                  <ul className="mt-8 flex-1 space-y-3">
+                    {FREE_FEATURES.map((f) => (
+                      <li
+                        key={f}
+                        className="flex items-start gap-2 text-sm text-muted-foreground"
+                      >
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 opacity-50" />
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-8 text-center text-xs text-muted-foreground">
+                    {premium ? "Your account is on Premium" : "Current plan"}
+                  </p>
                 </div>
-                <p className="mt-2 text-3xl tracking-tight">
-                  HK$80
-                  <span className="text-base font-normal text-muted-foreground"> / month</span>
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  or HK$700 / year (save ~2 months)
-                </p>
 
-                <ul className="mt-8 flex-1 space-y-3">
-                  {PREMIUM_FEATURES.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-sm">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#d4af37]" />
-                      <span>{f}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="mt-8 space-y-3">
-                  {premium?.active ? (
-                    <>
-                      <div className="rounded-xl border border-[#d4af37]/30 bg-background/50 px-4 py-3 text-center">
-                        <p className="text-xs text-muted-foreground">Next auto-payment in</p>
-                        <p className="mt-1 text-lg tracking-tight text-[#d4af37]">{countdown}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {new Date(premium.nextPaymentAt).toLocaleString("en-HK", {
-                            dateStyle: "medium",
-                            timeStyle: "short",
-                          })}
-                        </p>
-                      </div>
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="pill"
-                          className="flex-1"
-                          onClick={requestRefund}
-                        >
-                          Request refund
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="pill"
-                          className="flex-1"
-                          onClick={cancelSubscription}
-                        >
-                          Cancel subscription
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
-                    <Button asChild size="pill" className="w-full">
-                      <Link to={"/payment" as never}>Upgrade to Premium</Link>
-                    </Button>
+                {/* Premium */}
+                <div
+                  className={cn(
+                    "relative flex flex-col overflow-hidden rounded-2xl border border-[#d4af37]/70 bg-card p-6 md:p-8 snitch-gold-glow",
                   )}
-                </div>
-              </div>
-            </div>
+                >
+                  <Sparkles
+                    className="pointer-events-none absolute right-5 top-5 h-5 w-5 text-[#d4af37] snitch-sparkle"
+                    aria-hidden
+                  />
+                  <Sparkles
+                    className="pointer-events-none absolute bottom-8 left-6 h-4 w-4 text-[#d4af37]/80 snitch-sparkle snitch-sparkle-delay"
+                    aria-hidden
+                  />
 
-            <p className="text-center text-xs text-muted-foreground/80">
-              <Link to={"/" as never} className="underline-offset-4 hover:underline">
-                Terms of service
-              </Link>
-              <span className="mx-2">·</span>
-              <Link to={"/" as never} className="underline-offset-4 hover:underline">
-                Refund policy
-              </Link>
-              <span className="mx-2">·</span>
-              <Link to={"/" as never} className="underline-offset-4 hover:underline">
-                Subscription policy
-              </Link>
-            </p>
-            <p className="text-center text-[11px] text-muted-foreground/60">
-              Payments are not live yet. Premium status is stored locally for UI testing.
-            </p>
-          </div>
-        </main>
-      </div>
-    </div>
-  );
-}
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-[#d4af37]">Premium</p>
+                    <span className="rounded-full border border-[#d4af37]/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-[#d4af37]">
+                      Recommended
+                    </span>
+                  </div>
+                  <p className="mt-2 text-3xl tracking-tight">
+                    HK$80
+                    <span className="text-base font-normal text-muted-foreground">
+                      {" "}
+                      / month
+                    </span>
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    or HK$700 / year (save ~2 months)
+                  </p>
+
+                  <ul className="mt-8 flex-1 space-y-3">
+                    {PREMIUM_FEATURES.map((f) => (
+                      <li key={f} className="flex items-start gap-2 text-sm">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#d4af37]" />
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="mt-8 space-y-3">
+                    {premium ? (
+                      <>
+                        <div className="rounded-xl border border-[#d4af37]/30 bg-background/50 px-4 py-3 text-center">
+                          <p className="text-xs text-muted-foreground">
+                            Next auto-payment in
+                          </p>
+                          <p className="mt-1 text-lg tracking-tight text-[#d4af37]">
+                            {countdown || "—"}
+                          </p>
+                          {renewsAt && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {new Date(renewsAt).toLocaleString("en-HK", {
