@@ -7,6 +7,9 @@ import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { usePlan } from "@/hooks/use-plan";
+import { planDisplayAccess } from "@/lib/plan";
+import { PlanBlur } from "@/components/plan-blur";
 import { BriefRow, briefDayLabel, briefSources, utcBriefDay, type DailyBrief } from "@/lib/daily-briefs";
 
 export const Route = createFileRoute("/_authenticated/briefs")({
@@ -28,6 +31,8 @@ const NAV = [
 ] as const;
 
 function Briefs() {
+  const { premium, loading: planLoading } = usePlan();
+  const access = planDisplayAccess(premium, planLoading);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const today = utcBriefDay();
@@ -38,7 +43,7 @@ function Briefs() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [selected, setSelected] = useState(today);
-  const active = history.find(b => b.day === selected);
+  const active = history.find(b => b.day === (access.briefHistoryBlurred ? today : selected));
   const sources = active ? briefSources(active.highlights) : [];
   const loadBriefs = useCallback(async () => {
     setLoading(true);
@@ -67,6 +72,7 @@ function Briefs() {
     void navigate({ to: "/auth", replace: true });
   }
   async function generate() {
+    if (planLoading || (active && !access.canRegenerateBrief)) return;
     setGenerating(true); setActionError(null);
     try {
       const { data, error } = await supabase.auth.getSession();
@@ -146,16 +152,17 @@ const result = z.object({ brief: BriefRow }).parse(payload);
                     <p>AI estimate from public sources</p><h3>Sources</h3>
                     {sources.length ? <ul className="space-y-1">{sources.map(source => <li key={source}><a href={source} target="_blank" rel="noopener noreferrer" className="break-all underline underline-offset-2">{source}</a></li>)}</ul> : <p>No public source links were available in the collected information.</p>}
                   </div>
-                  {active.day === today && <Button variant="ghost" size="sm" onClick={generate} disabled={generating}>{generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCw className="mr-2 h-4 w-4" />}{generating ? "Generating…" : "Regenerate"}</Button>}
+                  {active.day === today && <Button variant="ghost" size="sm" onClick={generate} disabled={generating || !access.canRegenerateBrief}>{generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCw className="mr-2 h-4 w-4" />}{generating ? "Generating…" : "Regenerate"}</Button>}
                 </article> : <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 p-6 text-center">
                   <p className="text-sm text-muted-foreground">{selected === today ? "No brief for today yet." : "No brief for this day."}</p>
-                  {selected === today && <Button variant="outline" size="icon" className="h-16 w-16 rounded-full" onClick={generate} disabled={generating} aria-label="Generate today's brief" title="Generate today's brief">{generating ? <Loader2 className="h-6 w-6 animate-spin" /> : <Sparkles className="h-6 w-6" />}</Button>}
+                  {selected === today && <Button variant="outline" size="icon" className="h-16 w-16 rounded-full" onClick={generate} disabled={generating || planLoading} aria-label="Generate today's brief" title="Generate today's brief">{generating ? <Loader2 className="h-6 w-6 animate-spin" /> : <Sparkles className="h-6 w-6" />}</Button>}
                   {generating && <p role="status" className="text-sm text-muted-foreground">Generating brief…</p>}
                 </div>}
             </div>
           </section>
           <section>
             <h2 className="mb-4 text-lg">Unfinished Business</h2>
+            <PlanBlur locked={access.briefHistoryBlurred} loading={planLoading} label="brief history">
             <div className="grid gap-4 sm:grid-cols-2">{months.map(({ first, lead, days }) => <div key={first.toISOString()} className="rounded-2xl border border-border/60 bg-card p-4">
               <p className="mb-3 text-sm">{first.toLocaleDateString("en-HK", { timeZone: "UTC", month: "long", year: "numeric" })}</p>
               <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
@@ -169,6 +176,7 @@ const result = z.object({ brief: BriefRow }).parse(payload);
             <ul className="mt-4 space-y-2">{history.map(brief => <li key={brief.id}><Button variant="ghost" disabled={generating} onClick={() => setSelected(brief.day)} className={cn("h-auto w-full justify-start gap-2 whitespace-normal px-3 py-2 text-left text-sm text-muted-foreground", selected === brief.day && "bg-accent text-foreground")}>
               {brief.pinned && <Pin className="h-3.5 w-3.5 shrink-0" aria-label="Pinned" />}<span className="shrink-0">{brief.day}</span><span className="min-w-0 truncate">{brief.title}</span>
             </Button></li>)}</ul>
+            </PlanBlur>
           </section>
         </div>
       </main>
