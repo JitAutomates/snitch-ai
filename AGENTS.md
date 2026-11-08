@@ -19,3 +19,4 @@
 - Daily brief generation lives in a server-only module dynamically imported by its verified API handler; browser-safe schemas and pricing comparisons live in a separate utility to prevent provider code reaching the UI.
 - Brief regeneration inserts with conflict-ignore then updates only generated fields, never pinned; column-scoped SQL grants keep user edits limited to pinning and preserve concurrent pin changes.
 - Plan-gated presentation uses the shared PlanBlur wrapper and browser-safe planDisplayAccess helper; inert content and a Billing link prevent interacting with blurred controls without changing data authorization.
+- Brief generation reserves and finalizes durable database limits around provider work; profile edits use canonical public profiles guarded by a database trigger so direct requests cannot bypass cooldowns.

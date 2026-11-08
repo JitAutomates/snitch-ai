@@ -33,7 +33,7 @@ async function post({ request }: { request: Request }) {
         const users = z.array(z.object({ id: z.string().uuid() })).parse(data ?? []);
         for (const user of users) {
           if (results.length + failures.length > 0) await new Promise(resolve => setTimeout(resolve, 250));
-          try { await generateDailyBrief(user.id, day); results.push({ user_id: user.id, day }); }
+           try { await generateDailyBrief(user.id, day, "daily"); results.push({ user_id: user.id, day }); }
           catch { failures.push({ user_id: user.id, error: "Could not generate daily brief" }); }
         }
         if (users.length < 10) break;
@@ -49,8 +49,10 @@ async function post({ request }: { request: Request }) {
     const { data, error } = await client.auth.getUser(token);
     if (error || !data.user) return json({ error: "Unauthorized" }, 401);
     const { generateDailyBrief } = await import("@/server/briefs/generate-daily-brief");
-    return json({ ok: true, ...(await generateDailyBrief(data.user.id, day)) });
-   } catch {
+    return json({ ok: true, ...(await generateDailyBrief(data.user.id, day, parsed.data.reason)) });
+   } catch (error) {
+    const limit = z.object({ status: z.union([z.literal(403), z.literal(429)]), message: z.string(), retryAfter: z.number().optional() }).safeParse(error);
+    if (limit.success) return Response.json({ error: limit.data.message }, { status: limit.data.status, headers: { "Cache-Control": "no-store", ...(limit.data.retryAfter ? { "Retry-After": String(limit.data.retryAfter) } : {}) } });
     return json(
       {
         error: "Could not generate daily brief",

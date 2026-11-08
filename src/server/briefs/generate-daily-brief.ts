@@ -73,7 +73,7 @@ function extractJsonObject(raw: string): unknown {
 }
 
 export const generateDailyBrief = createServerOnlyFn(
-  async (userId: string, day: string) => {
+  async (userId: string, day: string, reason: "manual" | "onboarding" | "daily" = "manual") => {
     z.string().uuid().parse(userId);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
       throw new Error("Invalid brief day");
@@ -91,6 +91,16 @@ export const generateDailyBrief = createServerOnlyFn(
       "@/integrations/supabase/client.server"
     );
     const db = supabaseAdmin as SupabaseClient;
+    const reservation = await db.rpc("reserve_brief_generation", { p_user_id: userId, p_reason: reason });
+    if (reservation.error) throw new Error("Could not verify brief generation limits");
+    const permission = z.object({ allowed: z.boolean(), reservation_id: z.string().uuid().optional(), status: z.number().optional(), error: z.string().optional(), retry_after: z.number().optional() }).parse(reservation.data);
+    if (!permission.allowed) {
+      throw Object.assign(new Error(permission.error ?? "Brief generation is unavailable."), { status: permission.status ?? 429, retryAfter: permission.retry_after });
+    }
+    const ticket = permission.reservation_id;
+    if (!ticket) throw new Error("Could not reserve brief generation");
+    let success = false;
+    try {
 
     const at = new Date(`${day}T00:00:00Z`).getTime();
     const since = (days: number) =>
@@ -250,6 +260,7 @@ export const generateDailyBrief = createServerOnlyFn(
 
         const chat = (jsonFormat: boolean) =>
       fetch(`${base}/chat/completions`, {
+        signal: AbortSignal.timeout(60000),
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -374,6 +385,12 @@ export const generateDailyBrief = createServerOnlyFn(
           : String(saved.data.day).slice(0, 10),
     };
 
-    return { brief: BriefRow.parse(row) };
+    const brief = BriefRow.parse(row);
+    success = true;
+    return { brief };
+    } finally {
+      const completed = await db.rpc("finish_brief_generation", { p_user_id: userId, p_reservation_id: ticket, p_success: success });
+      if (completed.error || completed.data !== true) throw new Error("Could not finalize brief generation limits");
+    }
   },
 );

@@ -58,9 +58,9 @@ function SettingsPage() {
       try {
         const { data, error } = await supabase.auth.getUser();
         if (error || !data.user) throw error ?? new Error("Please sign in again.");
-        const values = profileFromMetadata(data.user.user_metadata);
-        const { data: profile } = await supabase.from("profiles").select("display_name").eq("id", data.user.id).maybeSingle();
-        if (!values.display_name && profile?.display_name) values.display_name = profile.display_name;
+        const { data: profile, error: profileError } = await supabase.from("profiles").select("display_name, industry, product, region, scale, sales_volume").eq("id", data.user.id).single();
+        if (profileError) throw profileError;
+        const values = profileFromMetadata(profile);
         if (!cancelled) { setFields(values); setOriginal(values); }
       } catch {
         if (!cancelled) { setLoadError(true); toast.error("Could not load your profile. Please reload and try again."); }
@@ -88,13 +88,12 @@ function SettingsPage() {
     setSaving(true);
     try {
       const refreshPeers = peerFieldsChanged(original, values);
-      const { data, error } = await supabase.auth.updateUser({ data: { ...values, sales_volume: sales } });
+      const { data, error } = await supabase.auth.getUser();
       if (error || !data.user) throw error ?? new Error("Could not save your profile.");
-      // The existing profiles schema supports display_name; business details live in auth metadata.
-      const { error: profileError } = await supabase.from("profiles").update({ display_name: values.display_name || null }).eq("id", data.user.id);
+      const { error: profileError } = await supabase.from("profiles").update({ ...values, display_name: values.display_name || null, sales_volume: sales }).eq("id", data.user.id);
+      if (profileError) throw new Error(profileError.code === "P0001" ? profileError.message : "Could not save your profile.");
       setOriginal(values); setFields(values);
-      if (profileError) toast.warning("Profile saved. Your display name could not be synced to the profile record.");
-      else toast.success("Profile saved.");
+      toast.success("Profile saved.");
       if (refreshPeers) {
         const { data: sessionData } = await supabase.auth.getSession();
         const token = sessionData.session?.access_token;
@@ -145,6 +144,7 @@ function SettingsPage() {
             <h1 className="text-3xl md:text-4xl">Settings</h1>
             <section className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6" aria-labelledby="profile-title">
               <h2 id="profile-title" className="mb-5 text-xl text-emphasis">Profile</h2>
+              <p className="mb-5 text-sm text-muted-foreground">Profile details can be changed once every 2 weeks.</p>
               {loading ? <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />Loading profile</p> : loadError ? <p role="alert" className="text-sm text-destructive">Could not load your profile. Please reload this page.</p> :
                 <form onSubmit={saveProfile} className="space-y-5">
                   <div className="grid gap-5 sm:grid-cols-2">

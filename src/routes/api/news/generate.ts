@@ -108,7 +108,8 @@ async function handlePost({ request }: { request: Request }) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const meta = userData.user.user_metadata ?? {};
+  const { data: meta, error: profileError } = await userClient.from("profiles").select("industry, product, region").eq("id", userData.user.id).single();
+  if (profileError || !meta) return Response.json({ error: "Could not load saved profile" }, { status: 500 });
   const profile = Profile.safeParse({
     industry: meta["industry"],
     product: meta["product"],

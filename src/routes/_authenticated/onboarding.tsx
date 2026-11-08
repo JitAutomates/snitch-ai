@@ -93,15 +93,16 @@ function OnboardingPage() {
     async function finish() {
     setBusy(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        data: {
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError || !auth.user) throw new Error("Please sign in again.");
+      const { error } = await supabase.from("profiles").update({
           industry: industry.trim().slice(0, 120),
           product: product.trim().slice(0, 200),
           region,
           scale,
           sales_volume: Number(Number(salesVolume).toPrecision(2)),
-        },
-      });
+          onboarded: true,
+      }).eq("id", auth.user.id);
       if (error) throw error;
 
       const { data: sessionData } = await supabase.auth.getSession();
