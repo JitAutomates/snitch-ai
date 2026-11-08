@@ -130,11 +130,6 @@ export const resolvePeersWithExa = createServerOnlyFn(async function resolvePeer
   const { error: profileError } = await db
     .from("profiles")
     .update({
-      industry: profile.industry,
-      product: profile.product,
-      region: profile.region,
-      scale: profile.scale,
-      sales_volume: Number(profile.sales) || null,
       peers_resolved_at: new Date().toISOString(),
       peers_resolve_status: "ok",
       onboarded: true,

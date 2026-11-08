@@ -56,7 +56,7 @@ const FREE_FEATURES = [
 const PREMIUM_FEATURES = [
   "Full competitor monitor detail",
   "Unblurred niche news & peer pricing",
-  "Daily brief generate & regenerate",
+  "Daily briefs & 4 brief regenerations per day (UTC)",
   "Pinned briefs & history",
   "Priority alerts",
   "Full peer pricing band",
