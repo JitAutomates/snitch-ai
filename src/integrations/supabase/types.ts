@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      brief_generation_limits: {
+        Row: {
+          created_at: string
+          last_generated_at: string | null
+          regeneration_count: number
+          reservation_id: string | null
+          reserved_regeneration: boolean
+          reserved_until: string | null
+          updated_at: string
+          usage_day: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          last_generated_at?: string | null
+          regeneration_count?: number
+          reservation_id?: string | null
+          reserved_regeneration?: boolean
+          reserved_until?: string | null
+          updated_at?: string
+          usage_day?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          last_generated_at?: string | null
+          regeneration_count?: number
+          reservation_id?: string | null
+          reserved_regeneration?: boolean
+          reserved_until?: string | null
+          updated_at?: string
+          usage_day?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brief_generation_limits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       briefs: {
         Row: {
           action_plan: string
@@ -320,6 +364,7 @@ export type Database = {
           plan_renews_at: string | null
           plan_updated_at: string | null
           product: string | null
+          profile_changed_at: string | null
           region: string | null
           sales_volume: number | null
           scale: string | null
@@ -338,6 +383,7 @@ export type Database = {
           plan_renews_at?: string | null
           plan_updated_at?: string | null
           product?: string | null
+          profile_changed_at?: string | null
           region?: string | null
           sales_volume?: number | null
           scale?: string | null
@@ -356,6 +402,7 @@ export type Database = {
           plan_renews_at?: string | null
           plan_updated_at?: string | null
           product?: string | null
+          profile_changed_at?: string | null
           region?: string | null
           sales_volume?: number | null
           scale?: string | null
@@ -367,7 +414,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      finish_brief_generation: {
+        Args: {
+          p_reservation_id: string
+          p_success: boolean
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      reserve_brief_generation: {
+        Args: { p_reason: string; p_user_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
