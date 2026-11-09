@@ -104,9 +104,6 @@ function Index() {
         </section>
       </main>
       <footer className="border-t py-8 text-center text-sm text-muted-foreground">
-        Snitch. For users aged 18 and over.
-      </footer>
-            <footer className="border-t py-8 text-center text-sm text-muted-foreground">
         Snitch. For users aged 18 and over.{" "}
         <Link to="/terms" className="underline-offset-4 hover:underline">
           Terms and Conditions
