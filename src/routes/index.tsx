@@ -108,6 +108,10 @@ function Index() {
         <Link to="/terms" className="underline-offset-4 hover:underline">
           Terms and Conditions
         </Link>
+        <span className="mx-2">·</span>
+        <Link to="/privacy" className="underline-offset-4 hover:underline">
+          Privacy Policy
+        </Link>
       </footer>
     </div>
   );
