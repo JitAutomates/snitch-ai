@@ -216,6 +216,15 @@ function AuthPage() {
                     >
                       Terms and Conditions
                     </Link>
+                    and{" "}
+                    <Link
+                      to="/privacy"
+                      className="text-foreground underline underline-offset-4 hover:text-foreground/80"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Privacy Policy
+                    </Link>
                     . You must accept to create an account.
                   </span>
                 </label>
