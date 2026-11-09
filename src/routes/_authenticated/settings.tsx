@@ -155,8 +155,33 @@ function SettingsPage() {
                   <Button type="submit" size="pill" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" />}{saving ? "Saving" : "Save profile"}</Button>
                 </form>}
             </section>
-            <section className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6" aria-labelledby="subscription-title">
-              <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 id="subscription-title" className="text-xl text-emphasis">Subscription</h2><p className="mt-3">{premium?.active ? "Premium" : "Free"}</p>{premium?.nextPaymentAt && Number.isFinite(Date.parse(premium.nextPaymentAt)) && <p className="mt-1 text-sm text-muted-foreground">Next payment: {new Date(premium.nextPaymentAt).toLocaleString("en-HK", { dateStyle: "medium", timeStyle: "short" })}</p>}</div><Button asChild size="pill" variant="secondary"><Link to="/billing">Manage plan</Link></Button></div>
+                        <section className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6" aria-labelledby="subscription-title">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 id="subscription-title" className="text-xl text-emphasis">
+                    Subscription
+                  </h2>
+                  {planLoading ? (
+                    <p className="mt-3 text-sm text-muted-foreground">Loading plan…</p>
+                  ) : (
+                    <>
+                      <p className="mt-3">{premium ? "Premium" : "Free"}</p>
+                      {premium && renewsAt && Number.isFinite(Date.parse(renewsAt)) && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Next payment:{" "}
+                          {new Date(renewsAt).toLocaleString("en-HK", {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          })}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+                <Button asChild size="pill" variant="secondary">
+                  <Link to="/billing">Manage plan</Link>
+                </Button>
+              </div>
             </section>
             <section className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6" aria-labelledby="appearance-title">
               <h2 id="appearance-title" className="mb-5 text-xl text-emphasis">Appearance</h2>
