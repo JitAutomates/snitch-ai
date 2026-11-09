@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { COUNTRIES } from "@/lib/settings-countries";
+import { usePlan } from "@/hooks/use-plan";
 import { APPEARANCE_KEY, DEFAULT_APPEARANCE, applyAppearance, canConfirmAccountAction, loadAppearance, peerFieldsChanged, profileFromMetadata, type Appearance, type ProfileFields } from "@/lib/settings";
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -34,6 +35,7 @@ const NAV = [
 const EMPTY = profileFromMetadata({});
 
 function SettingsPage() {
+  const { premium, renewsAt, loading: planLoading } = usePlan();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [fields, setFields] = useState<ProfileFields>(EMPTY);
@@ -42,17 +44,12 @@ function SettingsPage() {
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
-  const [premium, setPremium] = useState<{ active: boolean; nextPaymentAt?: string } | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     setAppearance(loadAppearance());
-    try {
-      const value = JSON.parse(localStorage.getItem("snitch_premium") ?? "null");
-      if (value?.active === true) setPremium(value);
-    } catch { /* Invalid local plan state falls back to Free. */ }
     let cancelled = false;
     async function load() {
       try {
