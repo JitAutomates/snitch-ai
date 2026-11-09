@@ -200,9 +200,24 @@ function AuthPage() {
                     You must be 18 or older. We only keep a yes or no, not your birth date.
                   </p>
                 </div>
-                <label className="flex items-start gap-3 text-sm text-muted-foreground">
-                  <Checkbox checked={agree} onCheckedChange={(v) => setAgree(v === true)} />
-                  <span>I agree to the Terms of Service and Privacy Policy.</span>
+                                <label className="flex items-start gap-3 text-sm text-muted-foreground">
+                  <Checkbox
+                    checked={agree}
+                    onCheckedChange={(v) => setAgree(v === true)}
+                    required
+                  />
+                  <span>
+                    I agree to the{" "}
+                    <Link
+                      to="/terms"
+                      className="text-foreground underline underline-offset-4 hover:text-foreground/80"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Terms and Conditions
+                    </Link>
+                    . You must accept to create an account.
+                  </span>
                 </label>
               </>
             )}
