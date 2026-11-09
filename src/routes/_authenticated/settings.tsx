@@ -110,7 +110,7 @@ function SettingsPage() {
     setSigningOut(true);
     try {
       if (clearPreferences) {
-        localStorage.removeItem("snitch_premium"); localStorage.removeItem(APPEARANCE_KEY);
+        localStorage.removeItem(APPEARANCE_KEY);
         applyAppearance(DEFAULT_APPEARANCE);
       }
       await queryClient.cancelQueries(); queryClient.clear();
