@@ -273,12 +273,12 @@ function Billing() {
                     ))}
                   </ul>
 
-                  <div className="mt-8 space-y-3">
+                                    <div className="mt-8 space-y-3">
                     {premium ? (
                       <>
                         <div className="rounded-xl border border-[#d4af37]/30 bg-background/50 px-4 py-3 text-center">
                           <p className="text-xs text-muted-foreground">
-                            Next auto-payment in
+                            Next renewal in
                           </p>
                           <p className="mt-1 text-lg tracking-tight text-[#d4af37]">
                             {countdown || "—"}
@@ -296,31 +296,25 @@ function Billing() {
                           variant="secondary"
                           className="w-full"
                           disabled={busy}
-                          onClick={cancelSubscription}
+                          onClick={() => void openPortal()}
                         >
-                          Cancel subscription
+                          {busy ? "Opening…" : "Manage subscription"}
                         </Button>
-                        <Button
-                          variant="ghost"
-                          className="w-full"
-                          onClick={requestRefund}
-                        >
-                          Request refund
-                        </Button>
+                        <p className="text-center text-xs text-muted-foreground">
+                          Cancel or update payment method in the Stripe customer portal.
+                        </p>
                       </>
                     ) : (
                       <>
                         <Button
                           className="w-full"
                           disabled={busy}
-                          onClick={activatePremiumDemo}
+                          onClick={() => void startCheckout()}
                         >
-                          {busy ? "Activating…" : "Activate Premium (demo)"}
+                          {busy ? "Redirecting…" : "Upgrade to Premium — HK$80/mo"}
                         </Button>
                         <p className="text-center text-xs text-muted-foreground">
-                          Demo only. No payment is collected. Live payments are Pro only.
-                          Premium is HK$80 per month or HK$700 per year, renewing
-                          automatically until cancelled.
+                          Secure checkout via Stripe. Subscription renews monthly until you cancel.
                         </p>
                       </>
                     )}
