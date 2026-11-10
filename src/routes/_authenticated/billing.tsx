@@ -273,7 +273,7 @@ function Billing() {
                     ))}
                   </ul>
 
-                                    <div className="mt-8 space-y-3">
+                    <div className="mt-8 space-y-3">
                     {premium ? (
                       <>
                         <div className="rounded-xl border border-[#d4af37]/30 bg-background/50 px-4 py-3 text-center">
