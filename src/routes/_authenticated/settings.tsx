@@ -205,6 +205,12 @@ function SettingsPage() {
                 >
                   Terms and Conditions
                 </Link>
+                <Link
+                  to={"/privacy" as never}
+                  className="text-foreground underline-offset-4 hover:underline"
+                >
+                  Privacy Policy
+                </Link>
               </p>
             </section>
             <p className="text-xs text-muted-foreground">Changes to industry, product, region, scale or sales may refresh competitor peers (up to 10) via the existing peer resolver.</p>
