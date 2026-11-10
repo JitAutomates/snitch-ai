@@ -56,7 +56,7 @@ const FREE_FEATURES = [
 const PREMIUM_FEATURES = [
   "Full competitor monitor detail",
   "Unblurred niche news & peer pricing",
-  "Daily briefs & 4 brief regenerations per day (UTC)",
+  "Daily briefs & 4 brief regenerations per day",
   "Pinned briefs & history",
   "Priority alerts",
   "Full peer pricing band",
@@ -99,67 +99,58 @@ function Billing() {
     navigate({ to: "/auth", replace: true });
   }
 
-  async function activatePremiumDemo() {
+  async function startCheckout() {
     setBusy(true);
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
         toast.error("Sign in to upgrade.");
         return;
       }
-      const renews = new Date(Date.now() + 30 * 86400000).toISOString();
-      const { error } = await (supabase as SupabaseClient)
-        .from("profiles")
-        .update({
-          plan: "premium",
-          plan_updated_at: new Date().toISOString(),
-          plan_renews_at: renews,
-        })
-        .eq("id", auth.user.id);
-      if (error) {
-        toast.error(error.message);
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const body = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
+      if (!res.ok || !body?.url) {
+        toast.error(body?.error ?? "Could not start checkout.");
         return;
       }
-      await reload();
-      toast.success("Premium activated (demo).");
+      window.location.href = body.url;
     } finally {
       setBusy(false);
     }
   }
 
-  async function cancelSubscription() {
-    const ok = window.confirm(
-      "Cancel Premium? You will return to Free immediately (demo).",
-    );
-    if (!ok) return;
+  async function openPortal() {
     setBusy(true);
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) return;
-      const { error } = await (supabase as SupabaseClient)
-        .from("profiles")
-        .update({
-          plan: "free",
-          plan_updated_at: new Date().toISOString(),
-          plan_renews_at: null,
-        })
-        .eq("id", auth.user.id);
-      if (error) {
-        toast.error(error.message);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        toast.error("Sign in again.");
         return;
       }
-      await reload();
-      toast.success("Back on Free.");
+      const res = await fetch("/api/stripe/portal", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const body = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
+      if (!res.ok || !body?.url) {
+        toast.error(body?.error ?? "Could not open billing portal.");
+        return;
+      }
+      window.location.href = body.url;
     } finally {
       setBusy(false);
     }
-  }
-
-  function requestRefund() {
-    toast.message("Refund request", {
-      description:
-        "Demo only. Real refunds will follow the refund policy after Stripe is connected.",
-    });
   }
 
   return (
