@@ -104,8 +104,14 @@ const result = z.object({ brief: BriefRow }).parse(payload);
     } catch (error) { setActionError(error instanceof Error ? error.message : "Could not generate brief."); }
     finally { setGenerating(false); }
   }
-  async function togglePin() {
+
+    async function togglePin() {
     if (!active) return;
+    if (!access.canPinBrief) {
+      setActionError("Pinning briefs is a Premium feature.");
+      void navigate({ to: "/billing" });
+      return;
+    }
     setPinning(true); setActionError(null);
     try {
       const { data, error } = await (supabase as SupabaseClient).from("briefs")
@@ -117,6 +123,7 @@ const result = z.object({ brief: BriefRow }).parse(payload);
     } catch (error) { setActionError(error instanceof Error ? error.message : "Could not save your pin."); }
     finally { setPinning(false); }
   }
+  
   const months = useMemo(() => [-1, 0].map(offset => {
     const now = new Date();
     const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1));
