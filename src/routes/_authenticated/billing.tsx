@@ -147,7 +147,7 @@ function Billing() {
         toast.error(body?.error ?? "Could not open billing portal.");
         return;
       }
-      window.location.href = body.url;
+      window.open(body.url, "_blank")
     } finally {
       setBusy(false);
     }
