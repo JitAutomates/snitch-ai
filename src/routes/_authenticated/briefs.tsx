@@ -160,7 +160,37 @@ const result = z.object({ brief: BriefRow }).parse(payload);
                 <article className="space-y-5 break-words p-6 md:p-8">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0"><p className="mb-2 text-xs text-muted-foreground">{briefDayLabel(active.day)}</p><h2 className="text-2xl">{active.title}</h2></div>
-                    <Button variant="ghost" size="icon" aria-label={active.pinned ? "Unpin brief" : "Pin brief"} title={active.pinned ? "Unpin brief" : "Pin brief"} disabled={pinning} onClick={togglePin}><Pin className={cn("h-4 w-4", active.pinned && "fill-current")} /></Button>
+                                        <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={
+                        !access.canPinBrief
+                          ? "Pinning requires Premium"
+                          : active.pinned
+                            ? "Unpin brief"
+                            : "Pin brief"
+                      }
+                      title={
+                        !access.canPinBrief
+                          ? "Premium required to pin"
+                          : active.pinned
+                            ? "Unpin brief"
+                            : "Pin brief"
+                      }
+                      disabled={pinning || planLoading}
+                      onClick={() => void togglePin()}
+                      className="relative"
+                    >
+                      <Pin className={cn("h-4 w-4", active.pinned && access.canPinBrief && "fill-current")} />
+                      {!access.canPinBrief && !planLoading && (
+                        <span
+                          aria-hidden
+                          className="pointer-events-none absolute inset-0 flex items-center justify-center text-lg font-bold leading-none text-red-500"
+                        >
+                          ×
+                        </span>
+                      )}
+                    </Button>
                   </div>
                   <p className="whitespace-pre-line leading-relaxed">{active.body}</p>
                   <div><h3 className="mb-2 text-lg">Action plan</h3><p className="whitespace-pre-line leading-relaxed">{active.action_plan}</p></div>
