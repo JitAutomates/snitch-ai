@@ -13,6 +13,8 @@ export function planDisplayAccess(premium: boolean, loading = false) {
     monitorsBlurred: !unlocked,
     briefHistoryBlurred: !unlocked,
     canRegenerateBrief: unlocked,
+    canPinBrief: unlocked,
+    pinnedBriefsBlurred: !unlocked,
   };
 }
 
