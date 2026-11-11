@@ -41,13 +41,17 @@ function Briefs() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const today = utcBriefDay();
+  const search = Route.useSearch();
+  const [selected, setSelected] = useState(search.day ?? today);
+  useEffect(() => {
+    if (search.day) setSelected(search.day);
+  }, [search.day]);
   const [history, setHistory] = useState<DailyBrief[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [pinning, setPinning] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [selected, setSelected] = useState(today);
   const active = history.find(b => b.day === (access.briefHistoryBlurred ? today : selected));
   const sources = active ? briefSources(active.highlights) : [];
   const loadBriefs = useCallback(async () => {
