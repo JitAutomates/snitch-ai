@@ -160,7 +160,7 @@ const result = z.object({ brief: BriefRow }).parse(payload);
                 <article className="space-y-5 break-words p-6 md:p-8">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0"><p className="mb-2 text-xs text-muted-foreground">{briefDayLabel(active.day)}</p><h2 className="text-2xl">{active.title}</h2></div>
-                                        <Button
+                     <Button
                       variant="ghost"
                       size="icon"
                       aria-label={
