@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Radar,
@@ -9,9 +10,16 @@ import {
   Pin,
   Bell,
   Sparkles,
+  Loader2,
 } from "lucide-react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { usePlan } from "@/hooks/use-plan";
+import { planDisplayAccess } from "@/lib/plan";
+import { PlanBlur } from "@/components/plan-blur";
+import { BriefRow, briefDayLabel, type DailyBrief } from "@/lib/daily-briefs";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -26,30 +34,6 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   }),
   component: Dashboard,
 });
-
-// ---------------------------------------------------------------------------
-// Placeholder data (swap for real AI output later)
-// These stand in until briefs / monitor research are wired up.
-// ---------------------------------------------------------------------------
-
-const PINNED_BRIEFS = [
-  {
-    id: "1",
-    title: "Competitor pricing shift this week",
-    summary:
-      "Two peers adjusted list prices. Review whether your positioning still holds.",
-    source: "Price monitor",
-    pinnedAt: "Today",
-  },
-  {
-    id: "2",
-    title: "Niche news: funding round in adjacent space",
-    summary:
-      "A series A in a neighbouring category may pull attention and talent.",
-    source: "News monitor",
-    pinnedAt: "Yesterday",
-  },
-];
 
 const NOTABLE_UPDATES = [
   {
@@ -86,6 +70,38 @@ const NAV = [
 function Dashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { premium, loading: planLoading } = usePlan();
+  const access = planDisplayAccess(premium, planLoading);
+  const [pinned, setPinned] = useState<DailyBrief[]>([]);
+  const [loadingPinned, setLoadingPinned] = useState(true);
+  const [pinnedError, setPinnedError] = useState<string | null>(null);
+
+  const loadPinned = useCallback(async () => {
+    setLoadingPinned(true);
+    setPinnedError(null);
+    try {
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError || !auth.user) throw new Error("Sign in to load pinned briefs.");
+      const { data, error } = await (supabase as SupabaseClient)
+        .from("briefs")
+        .select("id, user_id, day, title, body, action_plan, highlights, pinned, model, created_at")
+        .eq("user_id", auth.user.id)
+        .eq("pinned", true)
+        .order("day", { ascending: false })
+        .limit(20);
+      if (error) throw new Error("Could not load pinned briefs.");
+      setPinned(z.array(BriefRow).parse(data ?? []));
+    } catch (e) {
+      setPinnedError(e instanceof Error ? e.message : "Could not load pinned briefs.");
+      setPinned([]);
+    } finally {
+      setLoadingPinned(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPinned();
+  }, [loadPinned]);
 
   async function signOut() {
     await queryClient.cancelQueries();
@@ -96,7 +112,6 @@ function Dashboard() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Top bar */}
       <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
         <div className="flex h-14 items-center justify-between px-5">
           <Link to="/" className="text-xl tracking-tight">
@@ -109,7 +124,6 @@ function Dashboard() {
       </header>
 
       <div className="flex flex-1">
-        {/* Sidebar */}
         <aside className="hidden w-16 shrink-0 border-r md:flex md:w-52 md:flex-col">
           <nav className="flex flex-1 flex-col gap-1 p-3">
             {NAV.map(({ to, label, icon: Icon }) => (
@@ -126,7 +140,6 @@ function Dashboard() {
           </nav>
         </aside>
 
-        {/* Main */}
         <main className="flex-1 px-5 py-8 md:px-8">
           <div className="mx-auto max-w-3xl space-y-10">
             <div className="flex flex-wrap items-end justify-between gap-4">
@@ -144,36 +157,64 @@ function Dashboard() {
               </Button>
             </div>
 
-            {/* Pinned briefs */}
             <section>
               <div className="mb-4 flex items-center gap-2">
                 <Pin className="h-4 w-4 text-muted-foreground" />
                 <h2 className="text-lg tracking-tight">Pinned briefs</h2>
               </div>
-              {PINNED_BRIEFS.length === 0 ? (
-                <p className="rounded-2xl bg-card p-6 text-sm text-muted-foreground">
-                  No pinned briefs yet. Generate a brief and pin items that need action.
-                </p>
-              ) : (
-                <ul className="space-y-3">
-                  {PINNED_BRIEFS.map((b) => (
-                    <li
-                      key={b.id}
-                      className="rounded-2xl border border-border/60 bg-card p-5"
-                    >
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <h3 className="text-base">{b.title}</h3>
-                        <span className="text-xs text-muted-foreground">{b.pinnedAt}</span>
-                      </div>
-                      <p className="mt-2 text-sm text-muted-foreground">{b.summary}</p>
-                      <p className="mt-3 text-xs text-muted-foreground">Source: {b.source}</p>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <PlanBlur
+                locked={access.pinnedBriefsBlurred}
+                loading={planLoading}
+                label="pinned briefs"
+              >
+                {loadingPinned ? (
+                  <p className="flex items-center gap-2 rounded-2xl bg-card p-6 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading pinned briefs…
+                  </p>
+                ) : pinnedError ? (
+                  <div className="space-y-3 rounded-2xl bg-card p-6">
+                    <p role="alert" className="text-sm text-destructive">
+                      {pinnedError}
+                    </p>
+                    <Button variant="secondary" size="sm" onClick={() => void loadPinned()}>
+                      Retry
+                    </Button>
+                  </div>
+                ) : pinned.length === 0 ? (
+                  <p className="rounded-2xl bg-card p-6 text-sm text-muted-foreground">
+                    No pinned briefs yet. Open a daily brief and pin it when it needs follow-up.
+                  </p>
+                ) : (
+                  <ul className="space-y-3">
+                    {pinned.map((b) => (
+                      <li key={b.id}>
+                        <Link
+                          to="/briefs"
+                          search={{ day: b.day }}
+                          className="block rounded-2xl border border-border/60 bg-card p-5 transition-colors hover:bg-accent/40"
+                        >
+                          <div className="flex flex-wrap items-baseline justify-between gap-2">
+                            <h3 className="text-base text-foreground">{b.title}</h3>
+                            <span className="text-xs text-muted-foreground">
+                              {briefDayLabel(b.day)}
+                            </span>
+                          </div>
+                          <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                            {b.body}
+                          </p>
+                          <p className="mt-3 flex items-center gap-1 text-xs text-muted-foreground">
+                            <Pin className="h-3 w-3 fill-current" />
+                            Pinned · open this day
+                          </p>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </PlanBlur>
             </section>
 
-            {/* Notification board */}
             <section>
               <div className="mb-4 flex items-center gap-2">
                 <Bell className="h-4 w-4 text-muted-foreground" />
