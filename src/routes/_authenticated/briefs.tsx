@@ -13,6 +13,10 @@ import { PlanBlur } from "@/components/plan-blur";
 import { BriefRow, briefDayLabel, briefSources, utcBriefDay, type DailyBrief } from "@/lib/daily-briefs";
 
 export const Route = createFileRoute("/_authenticated/briefs")({
+  validateSearch: (s: Record<string, unknown>): { day?: string } => {
+    const day = typeof s.day === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s.day) ? s.day : undefined;
+    return day ? { day } : {};
+  },
   head: () => ({ meta: [
     { title: "Daily Brief | Snitch" },
     { name: "description", content: "Generate sourced daily intelligence, review your history, and pin unfinished business." },
@@ -22,6 +26,7 @@ export const Route = createFileRoute("/_authenticated/briefs")({
   ] }),
   component: Briefs,
 });
+
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/monitors", label: "Monitors", icon: Radar },
