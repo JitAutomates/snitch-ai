@@ -164,7 +164,7 @@ export const generateNicheNews = createServerOnlyFn(
 
     await db.from("niche_news").delete().eq("user_id", userId).eq("day", day);
 
-    const { error: insertError } = await db.from("niche_news").insert(
+        const { error: insertError } = await db.from("niche_news").insert(
       articles.map((a) => ({
         user_id: userId,
         day,
@@ -172,6 +172,8 @@ export const generateNicheNews = createServerOnlyFn(
         headline: a.headline,
         body: a.body,
         source_urls: a.source_urls,
+        severe: a.severe,
+        severe_until: a.severe ? severeUntil : null,
       })),
     );
     if (insertError) throw new Error("Could not save niche news");
