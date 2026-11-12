@@ -29,6 +29,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { buildPeerPriceSeries, PriceObservations, type PriceObservation, publicCompanyUrl, summarizePeerPricing } from "@/lib/peer-pricing";
+import { SevereBadge } from "@/components/severe-badge";
+import { isSevereActive } from "@/lib/severe";
 
 export const Route = createFileRoute("/_authenticated/monitors")({
   head: () => ({
@@ -56,7 +58,13 @@ const NAV = [
 ] as const;
 
 // ---- Niche news (from public.niche_news) ----
-type NewsArticle = { headline: string; body: string; tag: string };
+type NewsArticle = {
+  headline: string;
+  body: string;
+  tag: string;
+  severe: boolean;
+  severe_until: string | null;
+};
 type NewsDay = { dateKey: string; dateLabel: string; articles: NewsArticle[] };
 
 // ---- Competitor alerts (carousel) ----
@@ -178,15 +186,20 @@ function Monitors() {
       // Safe cast: generated Database types may not include niche_news yet.
       const { data, error } = await (supabase as SupabaseClient)
         .from("niche_news")
-        .select("day, headline, body, tag")
+        .select("day, headline, body, tag, severe, severe_until")
         .order("day", { ascending: false })
         .limit(150);
       if (cancelled) return;
       if (error) {
         setNewsDays([]);
       } else {
-        const parsed = z.array(z.object({
-          day: z.string(), headline: z.string(), body: z.string(), tag: z.string(),
+                const parsed = z.array(z.object({
+          day: z.string(),
+          headline: z.string(),
+          body: z.string(),
+          tag: z.string(),
+          severe: z.boolean().optional().default(false),
+          severe_until: z.string().nullable().optional().default(null),
         })).safeParse(data ?? []);
         if (!parsed.success) {
           setNewsDays([]);
@@ -194,7 +207,13 @@ function Monitors() {
           const byDay = new Map<string, NewsArticle[]>();
           for (const row of parsed.data) {
             const list = byDay.get(row.day) ?? [];
-            list.push({ headline: row.headline, body: row.body, tag: row.tag });
+            list.push({
+              headline: row.headline,
+              body: row.body,
+              tag: row.tag,
+              severe: row.severe ?? false,
+              severe_until: row.severe_until ?? null,
+            });
             byDay.set(row.day, list);
           }
           const days: NewsDay[] = [...byDay.entries()]
