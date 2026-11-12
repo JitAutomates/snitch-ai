@@ -34,6 +34,7 @@ export const ExtractedActivity = z.object({
         headline: z.string().trim().min(1).max(160),
         summary: z.string().trim().min(1).max(600),
         source_url: z.string().url().max(2048),
+        severe: z.boolean().optional().default(false),
       }),
     )
     .max(20)
@@ -58,6 +59,8 @@ export const ActivityRows = z.array(
     source_url: z.string(),
     published_at: z.string().nullable(),
     created_at: z.string(),
+    severe: z.boolean().optional().default(false),
+    severe_until: z.string().nullable().optional(),
   }),
 );
 export type ActivityRow = z.infer<typeof ActivityRows>[number];
