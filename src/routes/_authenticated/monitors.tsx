@@ -193,7 +193,7 @@ function Monitors() {
       if (error) {
         setNewsDays([]);
       } else {
-                const parsed = z.array(z.object({
+        const parsed = z.array(z.object({
           day: z.string(),
           headline: z.string(),
           body: z.string(),
