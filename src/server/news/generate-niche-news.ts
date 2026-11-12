@@ -127,7 +127,14 @@ export const generateNicheNews = createServerOnlyFn(
       choices?: Array<{ message?: { content?: string } }>;
     };
     const raw = llmData.choices?.[0]?.message?.content ?? "{}";
-    let parsed: { articles?: Array<{ tag?: string; headline?: string; body?: string }> };
+        let parsed: {
+      articles?: Array<{
+        tag?: string;
+        headline?: string;
+        body?: string;
+        severe?: boolean;
+      }>;
+    };
     try {
       parsed = JSON.parse(raw) as typeof parsed;
     } catch {
