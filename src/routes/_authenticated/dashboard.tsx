@@ -331,31 +331,57 @@ function Dashboard() {
               </PlanBlur>
             </section>
 
-            <section>
+                        <section>
               <div className="mb-4 flex items-center gap-2">
                 <Bell className="h-4 w-4 text-muted-foreground" />
                 <h2 className="text-lg tracking-tight">Notable updates</h2>
               </div>
-              {NOTABLE_UPDATES.length === 0 ? (
+              {loadingNotables ? (
+                <p className="flex items-center gap-2 rounded-2xl bg-card p-6 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading notable updates…
+                </p>
+              ) : notablesError ? (
+                <div className="space-y-3 rounded-2xl bg-card p-6">
+                  <p role="alert" className="text-sm text-destructive">
+                    {notablesError}
+                  </p>
+                  <Button variant="secondary" size="sm" onClick={() => void loadNotables()}>
+                    Retry
+                  </Button>
+                </div>
+              ) : notables.length === 0 ? (
                 <p className="rounded-2xl bg-card p-6 text-sm text-muted-foreground">
-                  Nothing marked as notable yet. Monitors will surface significant
-                  price, news, and competitor moves here.
+                  No severe updates in the last week. High-impact news, competitor moves, and
+                  large pricing changes will appear here for 7 days.
                 </p>
               ) : (
                 <ul className="space-y-3">
-                  {NOTABLE_UPDATES.map((n) => (
-                    <li
-                      key={n.id}
-                      className="rounded-2xl border border-border/60 bg-card p-5"
-                    >
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <h3 className="text-base">{n.title}</h3>
-                        <span className="text-xs text-muted-foreground">{n.when}</span>
-                      </div>
-                      <p className="mt-2 text-sm text-muted-foreground">{n.detail}</p>
-                      <p className="mt-3 text-xs uppercase tracking-wide text-muted-foreground">
-                        {n.type}
-                      </p>
+                  {notables.map((n) => (
+                    <li key={n.id}>
+                      <Link
+                        to={n.href as never}
+                        className="block rounded-2xl border border-purple-500/30 bg-card p-5 transition-colors hover:bg-accent/40"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="flex min-w-0 items-start gap-2">
+                            <SevereBadge className="mt-0.5" />
+                            <h3 className="text-base text-foreground">{n.title}</h3>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(n.whenIso).toLocaleString("en-HK", {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            })}
+                          </span>
+                        </div>
+                        <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
+                          {n.detail}
+                        </p>
+                        <p className="mt-3 text-xs uppercase tracking-wide text-purple-500/90">
+                          {n.kind} · severe (7 days)
+                        </p>
+                      </Link>
                     </li>
                   ))}
                 </ul>
