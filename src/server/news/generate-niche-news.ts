@@ -134,12 +134,16 @@ export const generateNicheNews = createServerOnlyFn(
       throw new Error("LLM returned invalid JSON");
     }
 
+    const { severeUntilFrom } = await import("@/lib/severe");
+    const severeUntil = severeUntilFrom();
+
     const articles: NicheArticle[] = (parsed.articles ?? [])
       .map((a) => ({
         tag: String(a.tag ?? "Market").slice(0, 40),
         headline: String(a.headline ?? "").trim().slice(0, 200),
         body: String(a.body ?? "").trim().slice(0, 2000),
         source_urls: sourceUrls,
+        severe: a.severe === true,
       }))
       .filter((a) => a.headline && a.body)
       .slice(0, NICHE_NEWS_ARTICLE_COUNT);
