@@ -16,9 +16,10 @@ export function buildNicheNewsSearchQuery(input: {
 export function buildNicheNewsSystemPrompt(): string {
   return (
     `You write short niche news for Hong Kong startup founders. ` +
-    `Output ONLY valid JSON: {"articles":[{"tag":"Funding|Policy|Market|Talent|Competition","headline":"...","body":"..."}]}. ` +
+    `Output ONLY valid JSON: {"articles":[{"tag":"Funding|Policy|Market|Talent|Competition","headline":"...","body":"...","severe":false}]}. ` +
     `Exactly 3 articles. Headlines under 110 characters. Body 2-4 sentences, factual tone, no hype. ` +
-    `Use only the provided search snippets; if weak evidence, stay cautious. No markdown.`
+    `Set severe=true ONLY for unusually high-impact items (major funding, regulation that blocks the product, large competitor collapse/acquisition, sudden market shock). Default severe=false. Most articles must not be severe. ` +
+    `Use only the provided search snippets; if weak evidence, stay cautious and severe=false. No markdown.`
   );
 }
 
