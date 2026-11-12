@@ -20,6 +20,8 @@ import { usePlan } from "@/hooks/use-plan";
 import { planDisplayAccess } from "@/lib/plan";
 import { PlanBlur } from "@/components/plan-blur";
 import { BriefRow, briefDayLabel, type DailyBrief } from "@/lib/daily-briefs";
+import { SevereBadge } from "@/components/severe-badge";
+import { isSevereActive, type NotableUpdate } from "@/lib/severe";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -35,29 +37,6 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
-const NOTABLE_UPDATES = [
-  {
-    id: "n1",
-    type: "price" as const,
-    title: "Orbit AI dropped entry tier by 12%",
-    detail: "Public pricing page updated. May pressure mid-market deals.",
-    when: "2h ago",
-  },
-  {
-    id: "n2",
-    type: "news" as const,
-    title: "Industry report flags higher churn in your segment",
-    detail: "Third-party analysis cited in two trade outlets this morning.",
-    when: "5h ago",
-  },
-  {
-    id: "n3",
-    type: "competitor" as const,
-    title: "Nexus Soft launched a free tier",
-    detail: "Product hunt and docs updated. Worth a brief competitor note.",
-    when: "1d ago",
-  },
-];
 
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -97,7 +76,144 @@ function Dashboard() {
     } finally {
       setLoadingPinned(false);
     }
+}, []);
+    const [notables, setNotables] = useState<NotableUpdate[]>([]);
+  const [loadingNotables, setLoadingNotables] = useState(true);
+  const [notablesError, setNotablesError] = useState<string | null>(null);
+
+  const loadNotables = useCallback(async () => {
+    setLoadingNotables(true);
+    setNotablesError(null);
+    try {
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError || !auth.user) throw new Error("Sign in to load notable updates.");
+      const uid = auth.user.id;
+      const nowIso = new Date().toISOString();
+      const db = supabase as SupabaseClient;
+
+      const [newsRes, actRes, priceRes] = await Promise.all([
+        db
+          .from("niche_news")
+          .select("id, headline, body, day, severe, severe_until, source_urls")
+          .eq("user_id", uid)
+          .eq("severe", true)
+          .gt("severe_until", nowIso)
+          .order("day", { ascending: false })
+          .limit(15),
+        db
+          .from("competitor_activity")
+          .select(
+            "id, headline, summary, category, competitor_name, created_at, published_at, severe, severe_until, source_url",
+          )
+          .eq("user_id", uid)
+          .eq("severe", true)
+          .gt("severe_until", nowIso)
+          .order("created_at", { ascending: false })
+          .limit(15),
+        db
+          .from("peer_prices")
+          .select(
+            "id, competitor_name, amount, amount_display, currency, plan_label, observed_at, severe, severe_until, source_url, notes",
+          )
+          .eq("user_id", uid)
+          .eq("severe", true)
+          .gt("severe_until", nowIso)
+          .order("observed_at", { ascending: false })
+          .limit(15),
+      ]);
+
+      if (newsRes.error || actRes.error || priceRes.error) {
+        throw new Error("Could not load notable updates. Confirm severe columns exist.");
+      }
+
+      const items: NotableUpdate[] = [];
+
+      for (const row of newsRes.data ?? []) {
+        const r = row as {
+          id: string;
+          headline: string;
+          body: string;
+          day: string;
+          severe: boolean;
+          severe_until: string | null;
+        };
+        if (!isSevereActive(r.severe, r.severe_until)) continue;
+        items.push({
+          id: `news-${r.id}`,
+          kind: "news",
+          title: r.headline,
+          detail: r.body,
+          whenIso: `${r.day}T12:00:00.000Z`,
+          href: "/monitors",
+        });
+      }
+
+      for (const row of actRes.data ?? []) {
+        const r = row as {
+          id: string;
+          headline: string;
+          summary: string;
+          competitor_name: string;
+          created_at: string;
+          published_at: string | null;
+          severe: boolean;
+          severe_until: string | null;
+          source_url: string;
+        };
+        if (!isSevereActive(r.severe, r.severe_until)) continue;
+        items.push({
+          id: `activity-${r.id}`,
+          kind: "activity",
+          title: r.headline,
+          detail: `${r.competitor_name}: ${r.summary}`,
+          whenIso: r.published_at ?? r.created_at,
+          href: "/competitor-monitor",
+          sourceUrl: r.source_url,
+        });
+      }
+
+      for (const row of priceRes.data ?? []) {
+        const r = row as {
+          id: string;
+          competitor_name: string;
+          amount: number | null;
+          amount_display: string | null;
+          currency: string;
+          plan_label: string;
+          observed_at: string;
+          severe: boolean;
+          severe_until: string | null;
+          source_url: string | null;
+          notes: string | null;
+        };
+        if (!isSevereActive(r.severe, r.severe_until)) continue;
+        const priceLabel =
+          r.amount_display ??
+          (r.amount != null ? `${r.currency} ${r.amount}` : "price change");
+        items.push({
+          id: `pricing-${r.id}`,
+          kind: "pricing",
+          title: `${r.competitor_name} — ${r.plan_label}`,
+          detail: `Significant pricing move: ${priceLabel}. ${r.notes ?? ""}`.trim(),
+          whenIso: r.observed_at,
+          href: "/monitors",
+          sourceUrl: r.source_url,
+        });
+      }
+
+      items.sort((a, b) => b.whenIso.localeCompare(a.whenIso));
+      setNotables(items.slice(0, 20));
+    } catch (e) {
+      setNotablesError(e instanceof Error ? e.message : "Could not load notables.");
+      setNotables([]);
+    } finally {
+      setLoadingNotables(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadNotables();
+  }, [loadNotables]);
 
   useEffect(() => {
     void loadPinned();
