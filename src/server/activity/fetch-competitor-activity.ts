@@ -210,7 +210,7 @@ async function collect(db: SupabaseClient, userId: string) {
       }
 
       // Drop anything not backed by a URL we actually retrieved (anti-hallucination).
-            const { severeUntilFrom } = await import("@/lib/severe");
+      const { severeUntilFrom } = await import("@/lib/severe");
       const severeUntil = severeUntilFrom();
 
       const rows = parsed.data.events
