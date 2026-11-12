@@ -210,6 +210,9 @@ async function collect(db: SupabaseClient, userId: string) {
       }
 
       // Drop anything not backed by a URL we actually retrieved (anti-hallucination).
+            const { severeUntilFrom } = await import("@/lib/severe");
+      const severeUntil = severeUntilFrom();
+
       const rows = parsed.data.events
         .filter((e) => byUrl.has(e.source_url))
         .slice(0, ACTIVITY_MAX_EVENTS_PER_PEER)
@@ -219,6 +222,7 @@ async function collect(db: SupabaseClient, userId: string) {
             published && Number.isFinite(Date.parse(published))
               ? new Date(published).toISOString()
               : null;
+          const severe = e.severe === true;
           return {
             user_id: userId,
             competitor_id: peer.id,
@@ -230,9 +234,11 @@ async function collect(db: SupabaseClient, userId: string) {
             summary: e.summary,
             source_url: e.source_url,
             published_at: publishedAt,
+            severe,
+            severe_until: severe ? severeUntil : null,
           };
         });
-
+      
       if (rows.length === 0) {
         skipped++;
         continue;
