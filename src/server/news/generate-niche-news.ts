@@ -17,6 +17,7 @@ export type NicheArticle = {
   headline: string;
   body: string;
   source_urls: string[];
+  severe: boolean;
 };
 
 /** ONLY function that may call Tavily + LLM for niche news. API route only. */
