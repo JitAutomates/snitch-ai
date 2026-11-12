@@ -192,6 +192,31 @@ async function collectPeerPrices(db: SupabaseClient, userId: string) {
         );
       }
 
+      let severe = false;
+      let severeUntil: string | null = null;
+
+      if (price?.amount != null && Number.isFinite(price.amount)) {
+        const { data: prevRows } = await db
+          .from("peer_prices")
+          .select("amount")
+          .eq("user_id", userId)
+          .eq("competitor_id", peer.id)
+          .eq("currency", price.currency)
+          .eq("plan_label", price.plan_label)
+          .not("amount", "is", null)
+          .order("observed_at", { ascending: false })
+          .limit(1);
+        const prev = (prevRows as Array<{ amount: number }> | null)?.[0]?.amount;
+        if (typeof prev === "number" && prev > 0) {
+          const rel = Math.abs(price.amount - prev) / prev;
+          if (rel >= 0.15) {
+            severe = true;
+            const { severeUntilFrom } = await import("@/lib/severe");
+            severeUntil = severeUntilFrom();
+          }
+        }
+      }
+
       const row = {
         user_id: userId,
         competitor_id: peer.id,
@@ -206,6 +231,8 @@ async function collectPeerPrices(db: SupabaseClient, userId: string) {
         notes: price
           ? `AI estimate from public sources; confidence: ${price.confidence}`
           : "No parseable public monthly pricing found on the company page.",
+        severe,
+        severe_until: severeUntil,
       };
 
       const { error: insertError } = await db.from("peer_prices").insert(row);
