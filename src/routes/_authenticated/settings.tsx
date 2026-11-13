@@ -263,7 +263,46 @@ function SettingsPage() {
           </div>
         </main>
       </div>
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}><DialogContent><DialogHeader><DialogTitle>Delete account</DialogTitle><DialogDescription>Full account deletion requires server-side support and is not available yet. Continuing clears local preferences and signs you out only. Your account and associated Snitch data will remain.</DialogDescription></DialogHeader><div className="space-y-2"><Label htmlFor="delete-confirmation">Type DELETE to confirm</Label><Input id="delete-confirmation" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} autoComplete="off" /></div><DialogFooter><Button variant="secondary" onClick={() => setDeleteOpen(false)}>Cancel</Button><Button variant="destructive" disabled={!canConfirmAccountAction(confirmation) || signingOut} onClick={() => { if (canConfirmAccountAction(confirmation)) void signOut(true); }}>Clear preferences &amp; sign out</Button></DialogFooter></DialogContent></Dialog>
-    </div>
+            <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete account</DialogTitle>
+            <DialogDescription>
+              This permanently deletes your Snitch account and associated data (profile, peers,
+              news, pricing, activity, briefs). If you have Premium, we will attempt to cancel the
+              Stripe subscription. Type DELETE to confirm. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-confirmation">Type DELETE to confirm</Label>
+            <Input
+              id="delete-confirmation"
+              value={confirmation}
+              onChange={(e) => setConfirmation(e.target.value)}
+              autoComplete="off"
+              disabled={deleting}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" disabled={deleting} onClick={() => setDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!canConfirmAccountAction(confirmation) || deleting}
+              onClick={() => void deleteAccount()}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                "Delete account permanently"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
   );
 }
