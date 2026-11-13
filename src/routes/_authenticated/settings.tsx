@@ -47,6 +47,7 @@ function SettingsPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [signingOut, setSigningOut] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setAppearance(loadAppearance());
@@ -106,22 +107,49 @@ function SettingsPage() {
     finally { setSaving(false); }
   }
 
-  async function signOut(clearPreferences = false) {
-    setSigningOut(true);
+    async function deleteAccount() {
+    if (!canConfirmAccountAction(confirmation)) return;
+    setDeleting(true);
     try {
-      if (clearPreferences) {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("Sign in again to delete your account.");
+      }
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const body = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        error?: string;
+        detail?: string;
+        warnings?: string[];
+      } | null;
+      if (!res.ok || !body?.ok) {
+        throw new Error(body?.error ?? body?.detail ?? "Could not delete account.");
+      }
+
+      try {
         localStorage.removeItem(APPEARANCE_KEY);
         applyAppearance(DEFAULT_APPEARANCE);
+      } catch {
+        /* ignore */
       }
-      await queryClient.cancelQueries(); queryClient.clear();
-      const { error } = await supabase.auth.signOut({ scope: "global" });
-      if (error) throw error;
-      if (clearPreferences) toast.message("Signed out and local preferences cleared. Your account and Snitch data have NOT been deleted; full deletion requires server-side support.", { duration: 12000 });
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      await supabase.auth.signOut({ scope: "global" }).catch(() => undefined);
+      setDeleteOpen(false);
+      toast.success("Your account and Snitch data have been deleted.");
       await navigate({ to: "/auth", replace: true });
-    } catch { toast.error("Could not sign out. Your account and data have not been deleted."); }
-    finally { setSigningOut(false); }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not delete account.");
+    } finally {
+      setDeleting(false);
+    }
   }
-
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
