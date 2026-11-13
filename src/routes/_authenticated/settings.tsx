@@ -219,10 +219,28 @@ function SettingsPage() {
                 <div className="flex items-center justify-between gap-3"><Label htmlFor="emphasis">Coloured emphasis</Label><Switch id="emphasis" checked={appearance.colouredEmphasis} onCheckedChange={(colouredEmphasis) => changeAppearance({ ...appearance, colouredEmphasis })} /></div>
               </div>
             </section>
-            <section className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6" aria-labelledby="account-title">
+                        <section className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6" aria-labelledby="account-title">
               <h2 id="account-title" className="text-xl text-emphasis">Data &amp; account</h2>
-              <div className="mt-5 flex flex-wrap gap-3"><Button variant="secondary" onClick={() => toast.message("Data export is coming soon.")}><Download className="mr-2 h-4 w-4" />Download my data</Button><Button variant="destructive" onClick={() => { setConfirmation(""); setDeleteOpen(true); }}><Trash2 className="mr-2 h-4 w-4" />Delete account</Button></div>
-              <p className="mt-4 text-sm text-muted-foreground">Account deletion permanently removes access and associated Snitch data. Full deletion is not available here yet; this action can only clear local preferences and sign you out.</p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Button variant="secondary" onClick={() => toast.message("Data export is coming soon.")}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download my data
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setConfirmation("");
+                    setDeleteOpen(true);
+                  }}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete account
+                </Button>
+              </div>
+              <p className="mt-4 text-sm text-muted-foreground">
+                Deleting your account permanently removes your profile, monitors data, briefs, and
+                sign-in. Active Stripe subscriptions are cancelled when possible. This cannot be undone.
+              </p>
             </section>
                         <section className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6">
               <h2 className="text-xl text-emphasis">Legal</h2>
