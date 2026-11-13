@@ -83,22 +83,52 @@ function AuthPage() {
     setFormError(null);
     setBusy(true);
     try {
-      if (mode === "signup") {
+            if (mode === "signup") {
         if (!isAdult(birthDate)) throw new Error("You must be 18 or older to use Snitch.");
         if (!agree) throw new Error("Please accept the terms and privacy policy.");
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: window.location.origin,
-            // birth_date is checked on the server and then discarded; only a yes/no flag is kept.
-            data: { display_name: name.trim().slice(0, 80), birth_date: birthDate },
-          },
+        const res = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            password,
+            display_name: name.trim().slice(0, 80),
+            birth_date: birthDate,
+            agree: true,
+          }),
         });
-        if (error) throw error;
-        setSent("Check your email to confirm your account.");
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+          needsEmailConfirm?: boolean;
+          session?: { access_token: string; refresh_token: string } | null;
+        } | null;
+        if (!res.ok) throw new Error(body?.error ?? "Signup failed.");
+        if (body?.session) {
+          const { error } = await supabase.auth.setSession({
+            access_token: body.session.access_token,
+            refresh_token: body.session.refresh_token,
+          });
+          if (error) throw error;
+        } else {
+          setSent("Check your email to confirm your account.");
+        }
       } else if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const res = await fetch("/api/auth/signin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+          session?: { access_token: string; refresh_token: string };
+        } | null;
+        if (!res.ok || !body?.session) {
+          throw new Error(body?.error ?? "Incorrect email or password. Please try again.");
+        }
+        const { error } = await supabase.auth.setSession({
+          access_token: body.session.access_token,
+          refresh_token: body.session.refresh_token,
+        });
         if (error) throw error;
       } else if (mode === "magic") {
         const { error } = await supabase.auth.signInWithOtp({
