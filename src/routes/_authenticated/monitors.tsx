@@ -425,9 +425,12 @@ function Monitors() {
                         key={`${issue.dateKey}-${idx}`}
                         className={idx > 0 ? "border-t border-neutral-700 pt-6" : ""}
                       >
-                        <p className="text-[10px] uppercase tracking-widest text-neutral-500">{a.tag}</p>
-                        <h4 className="mt-1 font-serif text-xl leading-snug text-neutral-100 md:text-2xl">
-                          {a.headline}
+                                                <p className="text-[10px] uppercase tracking-widest text-neutral-500">{a.tag}</p>
+                        <h4 className="mt-1 flex items-start gap-2 font-serif text-xl leading-snug text-neutral-100 md:text-2xl">
+                          {isSevereActive(a.severe, a.severe_until) && (
+                            <SevereBadge className="mt-1" />
+                          )}
+                          <span>{a.headline}</span>
                         </h4>
                         <p className="mt-3 font-serif text-sm leading-relaxed text-neutral-400 md:text-base">
                           {a.body}
