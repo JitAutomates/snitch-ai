@@ -318,5 +318,6 @@ function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
   );
 }
