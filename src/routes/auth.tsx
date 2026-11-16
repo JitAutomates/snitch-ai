@@ -57,25 +57,46 @@ function AuthPage() {
   }, [search.mode]);
 
   // Signed-in users go straight to the dashboard.
-  useEffect(() => {
-  function goWhere(user: { user_metadata?: Record<string, unknown> } | null) {
-    if (!user) return;
-    // If the user has already answered the onboarding questions, go to dashboard
-    const meta = user.user_metadata ?? {};
-    const done = Boolean(meta["industry"] && meta["product"] && meta["region"] && meta["scale"]);
-    navigate({ to: done ? "/dashboard" : "/onboarding", replace: true });
-  }
+    useEffect(() => {
+    let cancelled = false;
 
-  supabase.auth.getUser().then(({ data }) => {
-    goWhere(data.user);
-  });
+    async function routeUser() {
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
+      if (!user || cancelled) return;
 
-  const { data } = supabase.auth.onAuthStateChange((e, session) => {
-    if (e === "SIGNED_IN") goWhere(session?.user ?? null);
-  });
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("is_adult, industry, product, region, scale, onboarded")
+        .eq("id", user.id)
+        .maybeSingle();
 
-  return () => data.subscription.unsubscribe();
-}, [navigate]);
+      if (cancelled) return;
+
+      // Google (and any user) without adult attestation
+      if (profile?.is_adult !== true && user.user_metadata?.["is_adult"] !== true) {
+        await navigate({ to: "/complete-signup", replace: true });
+        return;
+      }
+
+      const done = Boolean(
+        profile?.onboarded ||
+          (profile?.industry && profile?.product && profile?.region && profile?.scale),
+      );
+      await navigate({ to: done ? "/dashboard" : "/onboarding", replace: true });
+    }
+
+    void routeUser();
+
+    const { data } = supabase.auth.onAuthStateChange((e) => {
+      if (e === "SIGNED_IN") void routeUser();
+    });
+
+    return () => {
+      cancelled = true;
+      data.subscription.unsubscribe();
+    };
+  }, [navigate]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
