@@ -233,13 +233,9 @@ function SettingsPage() {
                 <div className="flex items-center justify-between gap-3"><Label htmlFor="emphasis">Coloured emphasis</Label><Switch id="emphasis" checked={appearance.colouredEmphasis} onCheckedChange={(colouredEmphasis) => changeAppearance({ ...appearance, colouredEmphasis })} /></div>
               </div>
             </section>
-                        <section className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6" aria-labelledby="account-title">
+                                    <section className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6" aria-labelledby="account-title">
               <h2 id="account-title" className="text-xl text-emphasis">Data &amp; account</h2>
-              <div className="mt-5 flex flex-wrap gap-3">
-                <Button variant="secondary" onClick={() => toast.message("Data export is coming soon.")}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Download my data
-                </Button>
+              <div className="mt-5">
                 <Button
                   variant="destructive"
                   onClick={() => {
