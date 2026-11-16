@@ -76,7 +76,15 @@ async function post({ request }: { request: Request }) {
         },
       },
     });
-
+    
+    if (data.user) {
+      await db.from("profiles").upsert(
+        { id: data.user.id, is_adult: true },
+        { onConflict: "id" },
+      );
+      // optional: strip birth_date from metadata via admin update
+    }
+    
     if (error) return json({ error: error.message }, 400);
 
     // Prefer session tokens when email confirmation is off
