@@ -306,7 +306,11 @@ function AuthPage() {
               <button className="block text-link" onClick={() => setMode("magic")}>
                 Email me a sign-in link instead
               </button>
-              <button className="block text-link" onClick={() => setMode("forgot")}>
+                            <button
+                type="button"
+                className="block text-link"
+                onClick={() => void navigate({ to: "/forget-password" })}
+              >
                 Forgot password?
               </button>
             </>
