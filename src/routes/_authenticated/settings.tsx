@@ -150,6 +150,20 @@ function SettingsPage() {
       setDeleting(false);
     }
   }
+    async function signOut() {
+    setSigningOut(true);
+    try {
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      const { error } = await supabase.auth.signOut({ scope: "global" });
+      if (error) throw error;
+      await navigate({ to: "/auth", replace: true });
+    } catch {
+      toast.error("Could not sign out.");
+    } finally {
+      setSigningOut(false);
+    }
+  }
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
