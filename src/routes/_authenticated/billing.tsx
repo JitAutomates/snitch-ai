@@ -87,6 +87,28 @@ function Billing() {
     return () => clearInterval(id);
   }, [premium, renewsAt]);
 
+    // Phase A: wipe any legacy demo Premium flag; plan comes only from profiles + Stripe.
+  useEffect(() => {
+    try {
+      localStorage.removeItem("snitch_premium");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  // After Stripe Checkout return (?checkout=success), refresh plan from Supabase.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get("checkout");
+    if (checkout === "success") {
+      void reload().then(() => {
+        toast.success("Payment received. Premium activates when Stripe confirms.");
+      });
+    } else if (checkout === "cancelled") {
+      toast.message("Checkout cancelled. You are still on Free.");
+    }
+  }, [reload]);
+
   const countdown = useMemo(() => {
     if (!renewsAt) return "";
     return formatCountdown(renewsAt, now);
