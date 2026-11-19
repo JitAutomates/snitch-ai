@@ -85,11 +85,11 @@ function Dashboard() {
     }
   }, [premium, planLoading]);
   
-    const [notables, setNotables] = useState<NotableUpdate[]>([]);
+  const [notables, setNotables] = useState<NotableUpdate[]>([]);
   const [loadingNotables, setLoadingNotables] = useState(true);
   const [notablesError, setNotablesError] = useState<string | null>(null);
 
-  const loadNotables = useCallback(async () => {
+    const loadNotables = useCallback(async () => {
     if (planLoading) return;
     if (!premium) {
       setNotables([]);
@@ -97,6 +97,8 @@ function Dashboard() {
       setLoadingNotables(false);
       return;
     }
+    setLoadingNotables(true);
+    setNotablesError(null);
     try {
       const { data: auth, error: authError } = await supabase.auth.getUser();
       if (authError || !auth.user) throw new Error("Sign in to load notable updates.");
@@ -133,8 +135,96 @@ function Dashboard() {
           .gt("severe_until", nowIso)
           .order("observed_at", { ascending: false })
           .limit(15),
-      ])
-    }, [premium, planLoading]);
+      ]);
+
+      if (newsRes.error || actRes.error || priceRes.error) {
+        throw new Error("Could not load notable updates. Confirm severe columns exist.");
+      }
+
+      const items: NotableUpdate[] = [];
+
+      for (const row of newsRes.data ?? []) {
+        const r = row as {
+          id: string;
+          headline: string;
+          body: string;
+          day: string;
+          severe: boolean;
+          severe_until: string | null;
+        };
+        if (!isSevereActive(r.severe, r.severe_until)) continue;
+        items.push({
+          id: `news-${r.id}`,
+          kind: "news",
+          title: r.headline,
+          detail: r.body,
+          whenIso: `${r.day}T12:00:00.000Z`,
+          href: "/monitors",
+        });
+      }
+
+      for (const row of actRes.data ?? []) {
+        const r = row as {
+          id: string;
+          headline: string;
+          summary: string;
+          competitor_name: string;
+          created_at: string;
+          published_at: string | null;
+          severe: boolean;
+          severe_until: string | null;
+          source_url: string;
+        };
+        if (!isSevereActive(r.severe, r.severe_until)) continue;
+        items.push({
+          id: `activity-${r.id}`,
+          kind: "activity",
+          title: r.headline,
+          detail: `${r.competitor_name}: ${r.summary}`,
+          whenIso: r.published_at ?? r.created_at,
+          href: "/competitor-monitor",
+          sourceUrl: r.source_url,
+        });
+      }
+
+      for (const row of priceRes.data ?? []) {
+        const r = row as {
+          id: string;
+          competitor_name: string;
+          amount: number | null;
+          amount_display: string | null;
+          currency: string;
+          plan_label: string;
+          observed_at: string;
+          severe: boolean;
+          severe_until: string | null;
+          source_url: string | null;
+          notes: string | null;
+        };
+        if (!isSevereActive(r.severe, r.severe_until)) continue;
+        const priceLabel =
+          r.amount_display ??
+          (r.amount != null ? `${r.currency} ${r.amount}` : "price change");
+        items.push({
+          id: `pricing-${r.id}`,
+          kind: "pricing",
+          title: `${r.competitor_name} — ${r.plan_label}`,
+          detail: `Significant pricing move: ${priceLabel}. ${r.notes ?? ""}`.trim(),
+          whenIso: r.observed_at,
+          href: "/monitors",
+          sourceUrl: r.source_url,
+        });
+      }
+
+      items.sort((a, b) => b.whenIso.localeCompare(a.whenIso));
+      setNotables(items.slice(0, 20));
+    } catch (e) {
+      setNotablesError(e instanceof Error ? e.message : "Could not load notables.");
+      setNotables([]);
+    } finally {
+      setLoadingNotables(false);
+    }
+  }, [premium, planLoading]);
 
       if (newsRes.error || actRes.error || priceRes.error) {
         throw new Error("Could not load notable updates. Confirm severe columns exist.");
