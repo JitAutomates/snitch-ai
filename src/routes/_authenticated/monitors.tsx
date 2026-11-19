@@ -106,34 +106,42 @@ function Monitors() {
   const priceCurrencies = [...new Set(priceSeries.lines.map(line => line.currency))];
   const pricingSummary = useMemo(() => summarizePeerPricing(prices, runStatus), [prices, runStatus]);
 
-  const loadPrices = useCallback(async () => {
+    const loadPrices = useCallback(async () => {
+    if (planLoading) return;
+    if (!premium) {
+      setPrices([]);
+      setPricesError(null);
+      setRunStatus(null);
+      setPricesLoading(false);
+      return;
+    }
+    setPricesLoading(true);
     try {
       const { data: auth, error: authError } = await supabase.auth.getUser();
       if (authError || !auth.user) throw new Error("Sign in to load peer pricing.");
       const since = new Date(Date.now() - 12 * 7 * 24 * 60 * 60 * 1000).toISOString();
-      const { data, error } = await (supabase as SupabaseClient).from("peer_prices")
-        .select("competitor_id, competitor_name, currency, amount, observed_at, source_url, plan_label")
-        .eq("user_id", auth.user.id).gte("observed_at", since)
-        .order("observed_at", { ascending: false }).limit(5000);
+      const { data, error } = await (supabase as SupabaseClient)
+        .from("peer_prices")
+        .select(
+          "competitor_id, competitor_name, currency, amount, observed_at, source_url, plan_label",
+        )
+        .eq("user_id", auth.user.id)
+        .gte("observed_at", since)
+        .order("observed_at", { ascending: false })
+        .limit(5000);
       if (error) throw new Error(error.message);
       const parsed = PriceObservations.safeParse(data ?? []);
       if (!parsed.success) throw new Error("Invalid peer pricing data.");
       setPrices(parsed.data);
       setPricesError(null);
-      // Latest collection run; the table may not exist yet, so ignore errors.
-      const { data: runData } = await (supabase as SupabaseClient).from("peer_price_runs")
-        .select("status, started_at").eq("user_id", auth.user.id)
-        .order("started_at", { ascending: false }).limit(1);
-      const run = z.array(z.object({ status: z.string(), started_at: z.string() })).safeParse(runData ?? []);
-      const latest = run.success ? run.data[0] : undefined;
-      const fresh = latest ? Date.now() - new Date(latest.started_at).getTime() < 15 * 60 * 1000 : false;
-      setRunStatus(latest?.status === "running" && fresh ? "running" : latest?.status ?? null);
+      setRunStatus(null);
     } catch (error) {
       setPricesError(error instanceof Error ? error.message : "Could not load peer pricing.");
+      setPrices([]);
     } finally {
       setPricesLoading(false);
     }
-  }, []);
+  }, [premium, planLoading]);
 
   useEffect(() => {
     void loadPrices();
