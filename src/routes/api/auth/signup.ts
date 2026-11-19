@@ -55,7 +55,7 @@ async function post({ request }: { request: Request }) {
       countRecent,
       recordEvent,
       SIGNUP_LIMIT,
-    } = await import("@/server/auth-rate-limits");
+    } = await import("@/server/auth-rate-limit");
 
     const ipHash = hashIp(clientIp(request));
     const recent = await countRecent(db, ipHash, "signup");
