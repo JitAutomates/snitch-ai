@@ -21,6 +21,7 @@ import {
   groupActivityByWeek,
   summarizeActivity,
 } from "@/lib/competitor-activity";
+import { usePlan } from "@/hooks/use-plan";
 import {
   latestSummaries,
   SummaryRows,
