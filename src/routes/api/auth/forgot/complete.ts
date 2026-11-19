@@ -54,21 +54,20 @@ async function post({ request }: { request: Request }) {
 
     const userId = await findAuthUserIdByEmail(db, email);
     if (!userId) return json({ error: "Account not found." }, 400);
-
-      try {
-      const { isPasswordLeaked, LEAKED_PASSWORD_MESSAGE } = await import(
-        "@/server/password-policy"
+  try {
+    const { isPasswordLeaked, LEAKED_PASSWORD_MESSAGE } = await import(
+      "@/server/password-policy"
       );
-      if (await isPasswordLeaked(parsed.data.password)) {
-        return json({ error: LEAKED_PASSWORD_MESSAGE }, 400);
-      }
-    } catch (e) {
-      console.error("[forgot/complete] password leak check failed", e);
-      return json(
-        { error: "Could not verify password safety. Try again in a moment." },
-        503,
-      );
+    if (await isPasswordLeaked(parsed.data.password)) {
+      return json({ error: LEAKED_PASSWORD_MESSAGE }, 400);
     }
+  } catch (e) {
+    console.error("[forgot/complete] password leak check failed", e);
+    return json(
+      { error: "Could not verify password safety. Try again in a moment." },
+      503,
+    );
+  }
   
     const { error: pwError } = await db.auth.admin.updateUserById(userId, {
       password: parsed.data.password,
