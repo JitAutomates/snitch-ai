@@ -89,6 +89,14 @@ function CompetitorMonitor() {
   const [activityLoading, setActivityLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshMsg, setRefreshMsg] = useState<string | null>(null);
+  const {premium, loading: planLoading } = usePlan();
+
+  useEffect(() => {
+    if (planLoading) return;
+    if (!premium) {
+      void navigate ({ to: "/billing", replace: true});
+    }
+  }, [premium, planLoading, navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,7 +139,13 @@ function CompetitorMonitor() {
   }, [peers, preselectId]);
 
   const loadActivity = useCallback(async () => {
-    setActivityLoading(true);
+    if (!premium) {
+      setActivity([]);
+      setSummaries([]);
+      setRunStatua(null);
+      setActivityLoading(false);
+      return;
+    }
     try {
       const db = supabase as SupabaseClient;
       const [actRes, sumRes, runRes] = await Promise.all([
@@ -165,7 +179,7 @@ function CompetitorMonitor() {
     } finally {
       setActivityLoading(false);
     }
-  }, []);
+  }, [premium]);
 
   useEffect(() => {
     void loadActivity();
