@@ -187,11 +187,18 @@ function Monitors() {
     };
   }, []);
 
-  useEffect(() => {
+    useEffect(() => {
     let cancelled = false;
     async function loadNews() {
+      if (planLoading) return;
+      if (!premium) {
+        if (!cancelled) {
+          setNewsDays([]);
+          setNewsLoading(false);
+        }
+        return;
+      }
       setNewsLoading(true);
-      // Safe cast: generated Database types may not include niche_news yet.
       const { data, error } = await (supabase as SupabaseClient)
         .from("niche_news")
         .select("day, headline, body, tag, severe, severe_until")
@@ -201,14 +208,18 @@ function Monitors() {
       if (error) {
         setNewsDays([]);
       } else {
-        const parsed = z.array(z.object({
-          day: z.string(),
-          headline: z.string(),
-          body: z.string(),
-          tag: z.string(),
-          severe: z.boolean().optional().default(false),
-          severe_until: z.string().nullable().optional().default(null),
-        })).safeParse(data ?? []);
+        const parsed = z
+          .array(
+            z.object({
+              day: z.string(),
+              headline: z.string(),
+              body: z.string(),
+              tag: z.string(),
+              severe: z.boolean().optional().default(false),
+              severe_until: z.string().nullable().optional().default(null),
+            }),
+          )
+          .safeParse(data ?? []);
         if (!parsed.success) {
           setNewsDays([]);
         } else {
@@ -228,7 +239,6 @@ function Monitors() {
             .sort((a, b) => (a[0] < b[0] ? 1 : -1))
             .map(([dateKey, articles]) => ({
               dateKey,
-              // Noon UTC avoids timezone shifting the calendar day.
               dateLabel: new Date(`${dateKey}T12:00:00Z`).toLocaleDateString("en-HK", {
                 weekday: "long",
                 year: "numeric",
@@ -246,7 +256,7 @@ function Monitors() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [premium, planLoading]);
 
   const maxOffset = Math.max(0, newsDays.length - 1);
   const clampedOffset = Math.min(dayOffset, maxOffset);
