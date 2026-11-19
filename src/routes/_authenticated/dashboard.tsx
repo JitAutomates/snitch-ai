@@ -55,7 +55,14 @@ function Dashboard() {
   const [loadingPinned, setLoadingPinned] = useState(true);
   const [pinnedError, setPinnedError] = useState<string | null>(null);
 
-  const loadPinned = useCallback(async () => {
+    const loadPinned = useCallback(async () => {
+    if (planLoading) return;
+    if (!premium) {
+      setPinned([]);
+      setPinnedError(null);
+      setLoadingPinned(false);
+      return;
+    }
     setLoadingPinned(true);
     setPinnedError(null);
     try {
@@ -76,7 +83,8 @@ function Dashboard() {
     } finally {
       setLoadingPinned(false);
     }
-}, []);
+  }, [premium, planLoading]);
+  
     const [notables, setNotables] = useState<NotableUpdate[]>([]);
   const [loadingNotables, setLoadingNotables] = useState(true);
   const [notablesError, setNotablesError] = useState<string | null>(null);
