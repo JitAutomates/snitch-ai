@@ -143,7 +143,7 @@ function Monitors() {
     }
   }, [premium, planLoading]);
 
-  useEffect(() => {
+    useEffect(() => {
     void loadPrices();
   }, [loadPrices]);
 
