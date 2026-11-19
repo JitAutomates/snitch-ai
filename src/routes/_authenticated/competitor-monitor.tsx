@@ -142,7 +142,7 @@ function CompetitorMonitor() {
     if (!premium) {
       setActivity([]);
       setSummaries([]);
-      setRunStatua(null);
+      setRunStatus(null);
       setActivityLoading(false);
       return;
     }
