@@ -90,8 +90,13 @@ function Dashboard() {
   const [notablesError, setNotablesError] = useState<string | null>(null);
 
   const loadNotables = useCallback(async () => {
-    setLoadingNotables(true);
-    setNotablesError(null);
+    if (planLoading) return;
+    if (!premium) {
+      setNotables([]);
+      setNotablesError(null);
+      setLoadingNotables(false);
+      return;
+    }
     try {
       const { data: auth, error: authError } = await supabase.auth.getUser();
       if (authError || !auth.user) throw new Error("Sign in to load notable updates.");
@@ -128,7 +133,8 @@ function Dashboard() {
           .gt("severe_until", nowIso)
           .order("observed_at", { ascending: false })
           .limit(15),
-      ]);
+      ])
+    }, [premium, planLoading]);
 
       if (newsRes.error || actRes.error || priceRes.error) {
         throw new Error("Could not load notable updates. Confirm severe columns exist.");
