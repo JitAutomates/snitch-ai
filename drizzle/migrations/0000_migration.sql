@@ -4,30 +4,117 @@ CREATE TABLE public.profiles (
   age_verified boolean NOT NULL DEFAULT false,
   email_opt_in boolean NOT NULL DEFAULT true,
   onboarded boolean NOT NULL DEFAULT false,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  industry text,
+  product text,
+  region text,
+  scale text,
+  sales_volume numeric,
+  is_adult boolean,
+  peers_resolved_at timestamptz,
+  peers_resolve_status text,
+  profile_changed_at timestamptz,
+  plan text NOT NULL DEFAULT 'free',
+  plan_updated_at timestamptz,
+  plan_renews_at timestamptz,
+  stripe_customer_id text,
+  stripe_subscription_id text
 );
-GRANT SELECT, UPDATE ON public.profiles TO authenticated;
-GRANT ALL ON public.profiles TO service_role;
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "own profile read" ON public.profiles FOR SELECT TO authenticated USING (auth.uid() = id);
-CREATE POLICY "own profile update" ON public.profiles FOR UPDATE TO authenticated USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 
--- Block field tampering: users may only change display_name and email_opt_in
+-- No table-level UPDATE for authenticated — column grants only
+GRANT SELECT ON public.profiles TO authenticated;
+GRANT UPDATE (
+  display_name,
+  email_opt_in,
+  age_verified,
+  is_adult,
+  onboarded,
+  industry,
+  product,
+  region,
+  scale,
+  sales_volume
+) ON public.profiles TO authenticated;
+
+GRANT ALL ON public.profiles TO service_role;
+
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "own profile read" ON public.profiles
+  FOR SELECT TO authenticated
+  USING (auth.uid() = id);
+
+CREATE POLICY "own profile update" ON public.profiles
+  FOR UPDATE TO authenticated
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
+
 CREATE OR REPLACE FUNCTION public.protect_profile_fields()
-RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  jwt_role text;
+  req_role text;
 BEGIN
-  IF current_user = 'authenticated' THEN
-    NEW.age_verified := OLD.age_verified;
-    NEW.onboarded := OLD.onboarded;
+  jwt_role := coalesce(
+    auth.jwt() ->> 'role',
+    current_setting('request.jwt.claim.role', true),
+    ''
+  );
+  req_role := coalesce(auth.role(), '');
+
+  IF req_role = 'service_role' OR jwt_role = 'service_role' THEN
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'UPDATE' THEN
     NEW.id := OLD.id;
     NEW.created_at := OLD.created_at;
+    NEW.plan := OLD.plan;
+    NEW.plan_updated_at := OLD.plan_updated_at;
+    NEW.plan_renews_at := OLD.plan_renews_at;
+    NEW.stripe_customer_id := OLD.stripe_customer_id;
+    NEW.stripe_subscription_id := OLD.stripe_subscription_id;
+    NEW.peers_resolved_at := OLD.peers_resolved_at;
+    NEW.peers_resolve_status := OLD.peers_resolve_status;
+  ELSIF TG_OP = 'INSERT' THEN
+    NEW.plan := 'free';
+    NEW.plan_updated_at := NULL;
+    NEW.plan_renews_at := NULL;
+    NEW.stripe_customer_id := NULL;
+    NEW.stripe_subscription_id := NULL;
   END IF;
-  RETURN NEW;
-END $$;
-CREATE TRIGGER profiles_protect BEFORE UPDATE ON public.profiles
-FOR EACH ROW EXECUTE FUNCTION public.protect_profile_fields();
 
--- Before insert: enforce 18+, then replace birth date with a boolean flag (birth date never stored)
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS profiles_protect ON public.profiles;
+CREATE TRIGGER profiles_protect
+  BEFORE INSERT OR UPDATE ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.protect_profile_fields();
+
+CREATE OR REPLACE FUNCTION public.protect_profile_billing_columns()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN public.protect_profile_fields();
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_protect_profile_billing ON public.profiles;
+CREATE TRIGGER trg_protect_profile_billing
+  BEFORE INSERT OR UPDATE ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.protect_profile_billing_columns();
+
 CREATE OR REPLACE FUNCTION public.verify_age_on_signup()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE bd date;
@@ -47,9 +134,13 @@ FOR EACH ROW EXECUTE FUNCTION public.verify_age_on_signup();
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-  INSERT INTO public.profiles (id, display_name, age_verified)
-  VALUES (NEW.id, NEW.raw_user_meta_data->>'display_name',
-          COALESCE((NEW.raw_user_meta_data->>'age_verified')::boolean, false));
+  INSERT INTO public.profiles (id, display_name, age_verified, plan)
+  VALUES (
+    NEW.id,
+    NEW.raw_user_meta_data->>'display_name',
+    COALESCE((NEW.raw_user_meta_data->>'age_verified')::boolean, false),
+    'free'
+  );
   RETURN NEW;
 END $$;
 CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users
