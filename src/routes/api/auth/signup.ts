@@ -23,6 +23,23 @@ function isAdult(iso: string): boolean {
   return d <= cutoff;
 }
 
+// Reject passwords that appear in known breaches (HIBP k-anonymity).
+try {
+  const { isPasswordLeaked, LEAKED_PASSWORD_MESSAGE } = await import(
+        "@/server/password-policy"
+      );
+  if (await isPasswordLeaked(parsed.data.password)) {
+        return json({ error: LEAKED_PASSWORD_MESSAGE }, 400);
+      }
+} catch (e) {
+  console.error("[auth/signup] password leak check failed", e);
+  // Fail closed: do not accept a password we could not verify.
+  return json(
+    { error: "Could not verify password safety. Try again in a moment." },
+    503,
+  );
+}
+
 async function post({ request }: { request: Request }) {
   try {
     const parsed = Body.safeParse(await request.json().catch(() => null));
