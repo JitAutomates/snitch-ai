@@ -23,29 +23,28 @@ function isAdult(iso: string): boolean {
   return d <= cutoff;
 }
 
-// Reject passwords that appear in known breaches (HIBP k-anonymity).
-try {
-  const { isPasswordLeaked, LEAKED_PASSWORD_MESSAGE } = await import(
-        "@/server/password-policy"
-      );
-  if (await isPasswordLeaked(parsed.data.password)) {
-        return json({ error: LEAKED_PASSWORD_MESSAGE }, 400);
-      }
-} catch (e) {
-  console.error("[auth/signup] password leak check failed", e);
-  // Fail closed: do not accept a password we could not verify.
-  return json(
-    { error: "Could not verify password safety. Try again in a moment." },
-    503,
-  );
-}
-
 async function post({ request }: { request: Request }) {
   try {
     const parsed = Body.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return json({ error: "Invalid signup payload" }, 400);
     if (!isAdult(parsed.data.birth_date)) {
       return json({ error: "You must be 18 or older to use Snitch." }, 400);
+    }
+
+    // Reject passwords that appear in known breaches (HIBP k-anonymity).
+    try {
+      const { isPasswordLeaked, LEAKED_PASSWORD_MESSAGE } = await import(
+        "@/server/password-policy"
+      );
+      if (await isPasswordLeaked(parsed.data.password)) {
+        return json({ error: LEAKED_PASSWORD_MESSAGE }, 400);
+      }
+    } catch (e) {
+      console.error("[auth/signup] password leak check failed", e);
+      return json(
+        { error: "Could not verify password safety. Try again in a moment." },
+        503,
+      );
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -56,7 +55,7 @@ async function post({ request }: { request: Request }) {
       countRecent,
       recordEvent,
       SIGNUP_LIMIT,
-    } = await import("@/server/auth-rate-limit");
+    } = await import("@/server/auth-rate-limits");
 
     const ipHash = hashIp(clientIp(request));
     const recent = await countRecent(db, ipHash, "signup");
@@ -67,7 +66,6 @@ async function post({ request }: { request: Request }) {
       );
     }
 
-    // Count attempt before calling Auth (limits abuse even when email is invalid)
     await recordEvent(db, ipHash, "signup");
 
     const url = process.env["SUPABASE_URL"];
@@ -93,18 +91,16 @@ async function post({ request }: { request: Request }) {
         },
       },
     });
-    
+
+    if (error) return json({ error: error.message }, 400);
+
     if (data.user) {
       await db.from("profiles").upsert(
         { id: data.user.id, is_adult: true },
         { onConflict: "id" },
       );
-      // optional: strip birth_date from metadata via admin update
     }
-    
-    if (error) return json({ error: error.message }, 400);
 
-    // Prefer session tokens when email confirmation is off
     return json({
       ok: true,
       needsEmailConfirm: !data.session,
