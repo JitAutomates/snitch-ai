@@ -1,7 +1,17 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { LayoutDashboard, Radar, FileText, CreditCard, Settings, Pin, Sparkles, Loader2, RotateCw } from "lucide-react";
+import {
+  LayoutDashboard,
+  Radar,
+  FileText,
+  CreditCard,
+  Settings,
+  Pin,
+  Sparkles,
+  Loader2,
+  RotateCw,
+} from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,20 +20,38 @@ import { cn } from "@/lib/utils";
 import { usePlan } from "@/hooks/use-plan";
 import { planDisplayAccess } from "@/lib/plan";
 import { PlanBlur } from "@/components/plan-blur";
-import { BriefRow, briefDayLabel, briefSources, utcBriefDay, type DailyBrief } from "@/lib/daily-briefs";
+import {
+  BriefRow,
+  briefDayLabel,
+  briefSources,
+  utcBriefDay,
+  type DailyBrief,
+} from "@/lib/daily-briefs";
 
 export const Route = createFileRoute("/_authenticated/briefs")({
   validateSearch: (s: Record<string, unknown>): { day?: string } => {
-    const day = typeof s.day === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s.day) ? s.day : undefined;
+    const day =
+      typeof s.day === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s.day) ? s.day : undefined;
     return day ? { day } : {};
   },
-  head: () => ({ meta: [
-    { title: "Daily Brief | Snitch" },
-    { name: "description", content: "Generate sourced daily intelligence, review your history, and pin unfinished business." },
-    { property: "og:title", content: "Daily Brief | Snitch" },
-    { property: "og:description", content: "Your saved competitor activity, pricing moves, niche news and action plans." },
-    { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" },
-  ] }),
+  head: () => ({
+    meta: [
+      { title: "Daily Brief | Snitch" },
+      {
+        name: "description",
+        content:
+          "Generate sourced daily intelligence, review your history, and pin unfinished business.",
+      },
+      { property: "og:title", content: "Daily Brief | Snitch" },
+      {
+        property: "og:description",
+        content:
+          "Your saved competitor activity, pricing moves, niche news and action plans.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
   component: Briefs,
 });
 
@@ -42,190 +70,464 @@ function Briefs() {
   const queryClient = useQueryClient();
   const today = utcBriefDay();
   const search = Route.useSearch();
-  const [selected, setSelected] = useState(search.day ?? today);
-  useEffect(() => {
-    if (search.day) setSelected(search.day);
-  }, [search.day]);
+
+  const [selected, setSelected] = useState(today);
   const [history, setHistory] = useState<DailyBrief[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [pinning, setPinning] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const active = history.find(b => b.day === (access.briefHistoryBlurred ? today : selected));
+
+  // Free: ignore ?day= deep links and stay on today. Premium: honour search.day.
+  useEffect(() => {
+    if (planLoading) return;
+    if (!premium) {
+      setSelected(today);
+      if (search.day && search.day !== today) {
+        void navigate({ to: "/briefs", search: {}, replace: true });
+      }
+      return;
+    }
+    if (search.day) setSelected(search.day);
+  }, [premium, planLoading, search.day, today, navigate]);
+
+  const active = history.find(
+    (b) => b.day === (access.briefHistoryBlurred ? today : selected),
+  );
   const sources = active ? briefSources(active.highlights) : [];
+
   const loadBriefs = useCallback(async () => {
+    if (planLoading) return false;
     setLoading(true);
     setLoadError(null);
     try {
       const { data: auth, error: authError } = await supabase.auth.getUser();
       if (authError || !auth.user) throw new Error("Sign in to load your briefs.");
-      const since = utcBriefDay(new Date(Date.now() - 59 * 86400000));
-      const { data, error } = await (supabase as SupabaseClient).from("briefs")
-        .select("id, user_id, day, title, body, action_plan, highlights, pinned, model, created_at")
-        .eq("user_id", auth.user.id).gte("day", since).lte("day", utcBriefDay())
-        .order("day", { ascending: false }).limit(60);
-      if (error) throw new Error("Could not load briefs. Check that the briefs table has been set up, then retry.");
+
+      let query = (supabase as SupabaseClient)
+        .from("briefs")
+        .select(
+          "id, user_id, day, title, body, action_plan, highlights, pinned, model, created_at",
+        )
+        .eq("user_id", auth.user.id)
+        .order("day", { ascending: false });
+
+      if (!premium) {
+        // Free: today only — no history payload to inspect
+        query = query.eq("day", utcBriefDay()).limit(1);
+      } else {
+        const since = utcBriefDay(new Date(Date.now() - 59 * 86400000));
+        query = query.gte("day", since).lte("day", utcBriefDay()).limit(60);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        throw new Error(
+          "Could not load briefs. Check that the briefs table has been set up, then retry.",
+        );
+      }
       setHistory(z.array(BriefRow).parse(data ?? []));
       return true;
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Could not load briefs.");
       return false;
-    } finally { setLoading(false); }
-  }, []);
-  useEffect(() => { void loadBriefs(); }, [loadBriefs]);
+    } finally {
+      setLoading(false);
+    }
+  }, [premium, planLoading]);
+
+  useEffect(() => {
+    void loadBriefs();
+  }, [loadBriefs]);
+
+  function selectDay(day: string) {
+    if (planLoading) return;
+    if (!premium) {
+      if (day !== today) {
+        setActionError("Brief history is a Premium feature.");
+        void navigate({ to: "/billing" });
+        return;
+      }
+      setSelected(today);
+      return;
+    }
+    setSelected(day);
+    void navigate({
+      to: "/briefs",
+      search: day === today ? {} : { day },
+      replace: true,
+    });
+  }
 
   async function signOut() {
-    await queryClient.cancelQueries(); queryClient.clear();
+    await queryClient.cancelQueries();
+    queryClient.clear();
     await supabase.auth.signOut({ scope: "global" });
     void navigate({ to: "/auth", replace: true });
   }
+
   async function generate() {
     if (planLoading || (active && !access.canRegenerateBrief)) return;
-    setGenerating(true); setActionError(null);
+    setGenerating(true);
+    setActionError(null);
     try {
       const { data, error } = await supabase.auth.getSession();
       if (error || !data.session) throw new Error("Sign in to generate a brief.");
-      const response = await fetch("/api/briefs/generate", { method: "POST", headers: {
-        "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}`,
-      }, body: JSON.stringify({ reason: "manual" }) });
+      const response = await fetch("/api/briefs/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${data.session.access_token}`,
+        },
+        body: JSON.stringify({ reason: "manual" }),
+      });
       const payload = await response.json().catch(() => ({} as Record<string, unknown>));
       if (!response.ok) {
         const apiError =
           typeof payload.error === "string" && payload.error.length > 0
-          ? payload.error
-          : `Could not generate (${response.status})`;
-  throw new Error(apiError);
-}
-const result = z.object({ brief: BriefRow }).parse(payload);
+            ? payload.error
+            : `Could not generate (${response.status})`;
+        throw new Error(apiError);
+      }
+      const result = z.object({ brief: BriefRow }).parse(payload);
       setSelected(result.brief.day);
-      setHistory(h => [result.brief, ...h.filter(b => b.id !== result.brief.id)].sort((a, b) => b.day.localeCompare(a.day)));
+      setHistory((h) =>
+        [result.brief, ...h.filter((b) => b.id !== result.brief.id)].sort((a, b) =>
+          b.day.localeCompare(a.day),
+        ),
+      );
       await loadBriefs();
-    } catch (error) { setActionError(error instanceof Error ? error.message : "Could not generate brief."); }
-    finally { setGenerating(false); }
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not generate brief.");
+    } finally {
+      setGenerating(false);
+    }
   }
 
-    async function togglePin() {
+  async function togglePin() {
     if (!active) return;
     if (!access.canPinBrief) {
       setActionError("Pinning briefs is a Premium feature.");
       void navigate({ to: "/billing" });
       return;
     }
-    setPinning(true); setActionError(null);
+    setPinning(true);
+    setActionError(null);
     try {
-      const { data, error } = await (supabase as SupabaseClient).from("briefs")
-        .update({ pinned: !active.pinned }).eq("id", active.id).eq("user_id", active.user_id)
-        .select("id, pinned").single();
+      const { data, error } = await (supabase as SupabaseClient)
+        .from("briefs")
+        .update({ pinned: !active.pinned })
+        .eq("id", active.id)
+        .eq("user_id", active.user_id)
+        .select("id, pinned")
+        .single();
       if (error) throw new Error("Could not save your pin. Please try again.");
       const saved = z.object({ id: z.string(), pinned: z.boolean() }).parse(data);
-      setHistory(h => h.map(b => b.id === saved.id ? { ...b, pinned: saved.pinned } : b));
-    } catch (error) { setActionError(error instanceof Error ? error.message : "Could not save your pin."); }
-    finally { setPinning(false); }
+      setHistory((h) =>
+        h.map((b) => (b.id === saved.id ? { ...b, pinned: saved.pinned } : b)),
+      );
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not save your pin.");
+    } finally {
+      setPinning(false);
+    }
   }
-  
-  const months = useMemo(() => [-1, 0].map(offset => {
-    const now = new Date();
-    const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1));
-    const count = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
-    return { first, lead: first.getUTCDay(), days: Array.from({ length: count }, (_, i) => new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), i + 1))) };
-  }), []);
-  const byDay = new Map(history.map(b => [b.day, b]));
 
-  return <div className="flex min-h-screen flex-col bg-background">
-    <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
-      <div className="flex h-14 items-center justify-between px-5">
-        <Link to="/" className="text-xl">Snitch</Link>
-        <Button variant="secondary" size="sm" onClick={signOut}>Sign out</Button>
-      </div>
-    </header>
-    <div className="flex flex-1">
-      <aside className="hidden w-16 shrink-0 border-r md:flex md:w-52 md:flex-col">
-        <nav className="flex flex-1 flex-col gap-1 p-3">{NAV.map(({ to, label, icon: Icon }) =>
-          <Link key={to} to={to} className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground [&.active]:bg-accent [&.active]:text-foreground">
-            <Icon className="h-4 w-4 shrink-0" /><span className="hidden md:inline">{label}</span>
-          </Link>)}</nav>
-      </aside>
-      <main className="min-w-0 flex-1 px-5 py-8 md:px-8">
-        <div className="mx-auto max-w-3xl space-y-10">
-          <section>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h1 className="text-3xl md:text-4xl">Daily Brief</h1>
-              {selected !== today && <Button variant="ghost" size="sm" onClick={() => setSelected(today)}>Today</Button>}
-            </div>
-            {actionError && <p role="alert" className="mb-4 text-sm text-destructive">{actionError}</p>}
-            <div className="min-h-[280px] rounded-2xl border border-border/60 bg-card">
-              {loading ? <p role="status" className="p-8 text-muted-foreground">Loading briefs…</p> : loadError ?
-                <div className="space-y-4 p-8"><p role="alert" className="text-sm text-destructive">{loadError}</p><Button variant="secondary" onClick={() => void loadBriefs()}>Retry</Button></div> : active ?
-                <article className="space-y-5 break-words p-6 md:p-8">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0"><p className="mb-2 text-xs text-muted-foreground">{briefDayLabel(active.day)}</p><h2 className="text-2xl">{active.title}</h2></div>
-                     <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={
-                        !access.canPinBrief
-                          ? "Pinning requires Premium"
-                          : active.pinned
-                            ? "Unpin brief"
-                            : "Pin brief"
-                      }
-                      title={
-                        !access.canPinBrief
-                          ? "Premium required to pin"
-                          : active.pinned
-                            ? "Unpin brief"
-                            : "Pin brief"
-                      }
-                      disabled={pinning || planLoading}
-                      onClick={() => void togglePin()}
-                      className="relative"
-                    >
-                      <Pin className={cn("h-4 w-4", active.pinned && access.canPinBrief && "fill-current")} />
-                      {!access.canPinBrief && !planLoading && (
-                        <span
-                          aria-hidden
-                          className="pointer-events-none absolute inset-0 flex items-center justify-center text-lg font-bold leading-none text-red-500"
-                        >
-                          ×
-                        </span>
-                      )}
+  const months = useMemo(
+    () =>
+      [-1, 0].map((offset) => {
+        const now = new Date();
+        const first = new Date(
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1),
+        );
+        const count = new Date(
+          Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0),
+        ).getUTCDate();
+        return {
+          first,
+          lead: first.getUTCDay(),
+          days: Array.from(
+            { length: count },
+            (_, i) =>
+              new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), i + 1)),
+          ),
+        };
+      }),
+    [],
+  );
+  const byDay = new Map(history.map((b) => [b.day, b]));
+
+  return (
+    <div className="flex min-h-screen flex-col bg-background">
+      <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
+        <div className="flex h-14 items-center justify-between px-5">
+          <Link to="/" className="text-xl">
+            Snitch
+          </Link>
+          <Button variant="secondary" size="sm" onClick={signOut}>
+            Sign out
+          </Button>
+        </div>
+      </header>
+      <div className="flex flex-1">
+        <aside className="hidden w-16 shrink-0 border-r md:flex md:w-52 md:flex-col">
+          <nav className="flex flex-1 flex-col gap-1 p-3">
+            {NAV.map(({ to, label, icon: Icon }) => (
+              <Link
+                key={to}
+                to={to}
+                className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground [&.active]:bg-accent [&.active]:text-foreground"
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="hidden md:inline">{label}</span>
+              </Link>
+            ))}
+          </nav>
+        </aside>
+        <main className="min-w-0 flex-1 px-5 py-8 md:px-8">
+          <div className="mx-auto max-w-3xl space-y-10">
+            <section>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h1 className="text-3xl md:text-4xl">Daily Brief</h1>
+                {selected !== today && (
+                  <Button variant="ghost" size="sm" onClick={() => selectDay(today)}>
+                    Today
+                  </Button>
+                )}
+              </div>
+              {actionError && (
+                <p role="alert" className="mb-4 text-sm text-destructive">
+                  {actionError}
+                </p>
+              )}
+              <div className="min-h-[280px] rounded-2xl border border-border/60 bg-card">
+                {loading ? (
+                  <p role="status" className="p-8 text-muted-foreground">
+                    Loading briefs…
+                  </p>
+                ) : loadError ? (
+                  <div className="space-y-4 p-8">
+                    <p role="alert" className="text-sm text-destructive">
+                      {loadError}
+                    </p>
+                    <Button variant="secondary" onClick={() => void loadBriefs()}>
+                      Retry
                     </Button>
                   </div>
-                  <p className="whitespace-pre-line leading-relaxed">{active.body}</p>
-                  <div><h3 className="mb-2 text-lg">Action plan</h3><p className="whitespace-pre-line leading-relaxed">{active.action_plan}</p></div>
-                  <div className="space-y-2 border-t pt-4 text-xs text-muted-foreground">
-                    <p>AI estimate from public sources</p><h3>Sources</h3>
-                    {sources.length ? <ul className="space-y-1">{sources.map(source => <li key={source}><a href={source} target="_blank" rel="noopener noreferrer" className="break-all underline underline-offset-2">{source}</a></li>)}</ul> : <p>No public source links were available in the collected information.</p>}
+                ) : active ? (
+                  <article className="space-y-5 break-words p-6 md:p-8">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="mb-2 text-xs text-muted-foreground">
+                          {briefDayLabel(active.day)}
+                        </p>
+                        <h2 className="text-2xl">{active.title}</h2>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={
+                          !access.canPinBrief
+                            ? "Pinning requires Premium"
+                            : active.pinned
+                              ? "Unpin brief"
+                              : "Pin brief"
+                        }
+                        title={
+                          !access.canPinBrief
+                            ? "Premium required to pin"
+                            : active.pinned
+                              ? "Unpin brief"
+                              : "Pin brief"
+                        }
+                        disabled={pinning || planLoading}
+                        onClick={() => void togglePin()}
+                        className="relative"
+                      >
+                        <Pin
+                          className={cn(
+                            "h-4 w-4",
+                            active.pinned && access.canPinBrief && "fill-current",
+                          )}
+                        />
+                        {!access.canPinBrief && !planLoading && (
+                          <span
+                            aria-hidden
+                            className="pointer-events-none absolute inset-0 flex items-center justify-center text-lg font-bold leading-none text-red-500"
+                          >
+                            ×
+                          </span>
+                        )}
+                      </Button>
+                    </div>
+                    <p className="whitespace-pre-line leading-relaxed">{active.body}</p>
+                    <div>
+                      <h3 className="mb-2 text-lg">Action plan</h3>
+                      <p className="whitespace-pre-line leading-relaxed">
+                        {active.action_plan}
+                      </p>
+                    </div>
+                    <div className="space-y-2 border-t pt-4 text-xs text-muted-foreground">
+                      <p>AI estimate from public sources</p>
+                      <h3>Sources</h3>
+                      {sources.length ? (
+                        <ul className="space-y-1">
+                          {sources.map((source) => (
+                            <li key={source}>
+                              <a
+                                href={source}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="break-all underline underline-offset-2"
+                              >
+                                {source}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p>
+                          No public source links were available in the collected
+                          information.
+                        </p>
+                      )}
+                    </div>
+                    {active.day === today && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={generate}
+                        disabled={generating || !access.canRegenerateBrief}
+                      >
+                        {generating ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <RotateCw className="mr-2 h-4 w-4" />
+                        )}
+                        {generating ? "Generating…" : "Regenerate"}
+                      </Button>
+                    )}
+                  </article>
+                ) : (
+                  <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 p-6 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      {selected === today
+                        ? "No brief for today yet."
+                        : "No brief for this day."}
+                    </p>
+                    {selected === today && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-16 w-16 rounded-full"
+                        onClick={generate}
+                        disabled={generating || planLoading}
+                        aria-label="Generate today's brief"
+                        title="Generate today's brief"
+                      >
+                        {generating ? (
+                          <Loader2 className="h-6 w-6 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-6 w-6" />
+                        )}
+                      </Button>
+                    )}
+                    {generating && (
+                      <p role="status" className="text-sm text-muted-foreground">
+                        Generating brief…
+                      </p>
+                    )}
                   </div>
-                  {active.day === today && <Button variant="ghost" size="sm" onClick={generate} disabled={generating || !access.canRegenerateBrief}>{generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCw className="mr-2 h-4 w-4" />}{generating ? "Generating…" : "Regenerate"}</Button>}
-                </article> : <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 p-6 text-center">
-                  <p className="text-sm text-muted-foreground">{selected === today ? "No brief for today yet." : "No brief for this day."}</p>
-                  {selected === today && <Button variant="outline" size="icon" className="h-16 w-16 rounded-full" onClick={generate} disabled={generating || planLoading} aria-label="Generate today's brief" title="Generate today's brief">{generating ? <Loader2 className="h-6 w-6 animate-spin" /> : <Sparkles className="h-6 w-6" />}</Button>}
-                  {generating && <p role="status" className="text-sm text-muted-foreground">Generating brief…</p>}
-                </div>}
-            </div>
-          </section>
-          <section>
-            <h2 className="mb-4 text-lg">Unfinished Business</h2>
-            <PlanBlur locked={access.briefHistoryBlurred} loading={planLoading} label="brief history">
-            <div className="grid gap-4 sm:grid-cols-2">{months.map(({ first, lead, days }) => <div key={first.toISOString()} className="rounded-2xl border border-border/60 bg-card p-4">
-              <p className="mb-3 text-sm">{first.toLocaleDateString("en-HK", { timeZone: "UTC", month: "long", year: "numeric" })}</p>
-              <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
-                {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => <span key={i}>{d}</span>)}
-                {Array.from({ length: lead }, (_, i) => <span key={`lead-${i}`} />)}
-                {days.map(date => { const day = utcBriefDay(date); const brief = byDay.get(day); return <Button key={day} variant="ghost" disabled={loading || generating} aria-label={briefDayLabel(day)} onClick={() => setSelected(day)} className={cn("relative h-auto min-w-0 aspect-square p-0 text-xs", brief && "text-foreground underline underline-offset-4", day === today && "border border-border", selected === day && "bg-accent text-foreground")}>
-                  {date.getUTCDate()}{brief?.pinned && <Pin className="absolute right-0.5 top-0.5 h-2.5 w-2.5" />}</Button>; })}
+                )}
               </div>
-            </div>)}</div>
-            {!loading && !loadError && !history.length && <p className="mt-4 text-sm text-muted-foreground">No saved briefs yet.</p>}
-            <ul className="mt-4 space-y-2">{history.map(brief => <li key={brief.id}><Button variant="ghost" disabled={generating} onClick={() => setSelected(brief.day)} className={cn("h-auto w-full justify-start gap-2 whitespace-normal px-3 py-2 text-left text-sm text-muted-foreground", selected === brief.day && "bg-accent text-foreground")}>
-              {brief.pinned && <Pin className="h-3.5 w-3.5 shrink-0" aria-label="Pinned" />}<span className="shrink-0">{brief.day}</span><span className="min-w-0 truncate">{brief.title}</span>
-            </Button></li>)}</ul>
-            </PlanBlur>
-          </section>
-        </div>
-      </main>
+            </section>
+
+            <section>
+              <h2 className="mb-4 text-lg">Unfinished Business</h2>
+              <PlanBlur
+                locked={access.briefHistoryBlurred}
+                loading={planLoading}
+                label="brief history"
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {months.map(({ first, lead, days }) => (
+                    <div
+                      key={first.toISOString()}
+                      className="rounded-2xl border border-border/60 bg-card p-4"
+                    >
+                      <p className="mb-3 text-sm">
+                        {first.toLocaleDateString("en-HK", {
+                          timeZone: "UTC",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </p>
+                      <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
+                        {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+                          <span key={i}>{d}</span>
+                        ))}
+                        {Array.from({ length: lead }, (_, i) => (
+                          <span key={`lead-${i}`} />
+                        ))}
+                        {days.map((date) => {
+                          const day = utcBriefDay(date);
+                          const brief = byDay.get(day);
+                          const lockedPast = !premium && day !== today;
+                          return (
+                            <Button
+                              key={day}
+                              variant="ghost"
+                              disabled={loading || generating || lockedPast}
+                              aria-label={briefDayLabel(day)}
+                              onClick={() => selectDay(day)}
+                              className={cn(
+                                "relative aspect-square h-auto min-w-0 p-0 text-xs",
+                                brief && "text-foreground underline underline-offset-4",
+                                day === today && "border border-border",
+                                selected === day && "bg-accent text-foreground",
+                              )}
+                            >
+                              {date.getUTCDate()}
+                              {brief?.pinned && (
+                                <Pin className="absolute right-0.5 top-0.5 h-2.5 w-2.5" />
+                              )}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {!loading && !loadError && !history.length && (
+                  <p className="mt-4 text-sm text-muted-foreground">No saved briefs yet.</p>
+                )}
+                <ul className="mt-4 space-y-2">
+                  {history.map((brief) => (
+                    <li key={brief.id}>
+                      <Button
+                        variant="ghost"
+                        disabled={generating || (!premium && brief.day !== today)}
+                        onClick={() => selectDay(brief.day)}
+                        className={cn(
+                          "h-auto w-full justify-start gap-2 whitespace-normal px-3 py-2 text-left text-sm text-muted-foreground",
+                          selected === brief.day && "bg-accent text-foreground",
+                        )}
+                      >
+                        {brief.pinned && (
+                          <Pin className="h-3.5 w-3.5 shrink-0" aria-label="Pinned" />
+                        )}
+                        <span className="shrink-0">{brief.day}</span>
+                        <span className="min-w-0 truncate">{brief.title}</span>
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </PlanBlur>
+            </section>
+          </div>
+        </main>
+      </div>
     </div>
-  </div>;
+  );
 }
