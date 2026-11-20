@@ -26,8 +26,6 @@ GRANT SELECT ON public.profiles TO authenticated;
 GRANT UPDATE (
   display_name,
   email_opt_in,
-  age_verified,
-  is_adult,
   onboarded,
   industry,
   product,
@@ -78,6 +76,8 @@ BEGIN
     NEW.plan_renews_at := OLD.plan_renews_at;
     NEW.stripe_customer_id := OLD.stripe_customer_id;
     NEW.stripe_subscription_id := OLD.stripe_subscription_id;
+    NEW.age_verified := OLD.age_verified;
+    NEW.is_adult := OLD.is_adult;
     NEW.peers_resolved_at := OLD.peers_resolved_at;
     NEW.peers_resolve_status := OLD.peers_resolve_status;
   ELSIF TG_OP = 'INSERT' THEN
