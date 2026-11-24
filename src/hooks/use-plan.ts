@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
-import { isPremium, PlanSchema, type Plan } from "@/lib/plan";
+import { isPremium, type Plan } from "@/lib/plan";
+import { authFetch } from "@/lib/api";
 
 export function usePlan() {
   const [plan, setPlan] = useState<Plan>("free");
@@ -11,27 +10,12 @@ export function usePlan() {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) {
-        setPlan("free");
-        setRenewsAt(null);
-        return;
-      }
-      const { data, error } = await (supabase as SupabaseClient)
-        .from("profiles")
-        .select("plan, plan_renews_at")
-        .eq("id", auth.user.id)
-        .maybeSingle();
-      if (error || !data) {
-        setPlan("free");
-        setRenewsAt(null);
-        return;
-      }
-      const parsed = PlanSchema.safeParse(data.plan);
-      setPlan(parsed.success ? parsed.data : "free");
-      setRenewsAt(
-        typeof data.plan_renews_at === "string" ? data.plan_renews_at : null,
-      );
+      const data = await authFetch("/api/me/profile");
+      setPlan(data.plan === "premium" ? "premium" : "free");
+      setRenewsAt(typeof data.renewsAt === "string" ? data.renewsAt : null);
+    } catch {
+      setPlan("free");
+      setRenewsAt(null);
     } finally {
       setLoading(false);
     }
