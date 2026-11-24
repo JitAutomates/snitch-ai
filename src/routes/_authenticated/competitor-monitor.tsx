@@ -10,9 +10,10 @@ import {
   ArrowLeft,
   ExternalLink,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { supabase } from "@/integrations/supabase/client";
+import { authFetch } from "@/lib/api";
+import { usePlan } from "@/hooks/use-plan";
 import { Button } from "@/components/ui/button";
 import {
   ActivityRows,
@@ -21,7 +22,6 @@ import {
   groupActivityByWeek,
   summarizeActivity,
 } from "@/lib/competitor-activity";
-import { usePlan } from "@/hooks/use-plan";
 import {
   latestSummaries,
   SummaryRows,
@@ -63,8 +63,8 @@ const peerRowSchema = z.object({
   sales_estimate: z.string().nullable(),
   rank: z.number().nullable(),
   resolved_at: z.string().nullable(),
-  source: z.string().nullable(),
-  exa_id: z.string().nullable(),
+  source: z.string().nullable().optional(),
+  exa_id: z.string().nullable().optional(),
 });
 type PeerRow = z.infer<typeof peerRowSchema>;
 
@@ -77,6 +77,7 @@ function CompetitorMonitor() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { id: preselectId } = Route.useSearch();
+  const { premium, loading: planLoading } = usePlan();
 
   const [peers, setPeers] = useState<PeerRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,45 +90,55 @@ function CompetitorMonitor() {
   const [activityLoading, setActivityLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshMsg, setRefreshMsg] = useState<string | null>(null);
-  const {premium, loading: planLoading } = usePlan();
 
   useEffect(() => {
     if (planLoading) return;
     if (!premium) {
-      void navigate ({ to: "/billing", replace: true});
+      void navigate({ to: "/billing", replace: true });
     }
   }, [premium, planLoading, navigate]);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadPeers() {
-      setLoading(true);
-      setError(null);
-      const { data, error: queryError } = await (supabase as SupabaseClient)
-        .from("competitors")
-        .select(
-          "id, name, company_url, scale, sales_estimate, rank, resolved_at, source, exa_id",
-        )
-        .order("rank", { ascending: true });
-      if (cancelled) return;
-      if (queryError) {
-        setError(queryError.message);
-        setPeers([]);
-      } else {
-        const parsed = z.array(peerRowSchema).safeParse(data ?? []);
-        if (parsed.success) setPeers(parsed.data);
-        else {
-          setPeers([]);
-          setError("Invalid competitor data");
-        }
-      }
+  const loadAll = useCallback(async () => {
+    if (planLoading) return;
+    if (!premium) {
+      setPeers([]);
+      setActivity([]);
+      setSummaries([]);
+      setRunStatus(null);
       setLoading(false);
+      setActivityLoading(false);
+      return;
     }
-    void loadPeers();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    setLoading(true);
+    setActivityLoading(true);
+    setError(null);
+    try {
+      const data = await authFetch("/api/data/competitors");
+      const peersParsed = z.array(peerRowSchema).safeParse(data.peers ?? []);
+      if (peersParsed.success) setPeers(peersParsed.data);
+      else {
+        setPeers([]);
+        setError("Invalid competitor data");
+      }
+      const actParsed = ActivityRows.safeParse(data.activity ?? []);
+      setActivity(actParsed.success ? actParsed.data : []);
+      const sumParsed = SummaryRows.safeParse(data.summaries ?? []);
+      setSummaries(sumParsed.success ? sumParsed.data : []);
+      setRunStatus(effectiveRunStatus(data.run ?? null));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load competitors");
+      setPeers([]);
+      setActivity([]);
+      setSummaries([]);
+    } finally {
+      setLoading(false);
+      setActivityLoading(false);
+    }
+  }, [premium, planLoading]);
+
+  useEffect(() => {
+    void loadAll();
+  }, [loadAll]);
 
   useEffect(() => {
     if (peers.length === 0) return;
@@ -138,68 +149,18 @@ function CompetitorMonitor() {
     });
   }, [peers, preselectId]);
 
-  const loadActivity = useCallback(async () => {
-    if (!premium) {
-      setActivity([]);
-      setSummaries([]);
-      setRunStatus(null);
-      setActivityLoading(false);
-      return;
-    }
-    try {
-      const db = supabase as SupabaseClient;
-      const [actRes, sumRes, runRes] = await Promise.all([
-        db
-          .from("competitor_activity")
-          .select(
-            "id, competitor_id, competitor_name, company_url, week_start, category, headline, summary, source_url, published_at, created_at",
-          )
-          .order("created_at", { ascending: false })
-          .limit(200),
-        db
-          .from("competitor_summaries")
-          .select("competitor_id, competitor_name, week_start, summary, source_urls")
-          .order("week_start", { ascending: false })
-          .limit(50),
-        db
-          .from("competitor_activity_runs")
-          .select("status, started_at")
-          .order("started_at", { ascending: false })
-          .limit(1),
-      ]);
-
-      const actParsed = ActivityRows.safeParse(actRes.data ?? []);
-      setActivity(actParsed.success ? actParsed.data : []);
-
-      const sumParsed = SummaryRows.safeParse(sumRes.data ?? []);
-      setSummaries(sumParsed.success ? sumParsed.data : []);
-
-      const latest = (runRes.data as Array<{ status: string; started_at: string }> | null)?.[0];
-      setRunStatus(effectiveRunStatus(latest ?? null));
-    } finally {
-      setActivityLoading(false);
-    }
-  }, [premium]);
-
-  useEffect(() => {
-    void loadActivity();
-  }, [loadActivity]);
-
-  // Poll while a run is in progress
   useEffect(() => {
     if (runStatus !== "running") return;
-    const t = setInterval(() => void loadActivity(), 8000);
+    const t = setInterval(() => void loadAll(), 8000);
     return () => clearInterval(t);
-  }, [runStatus, loadActivity]);
+  }, [runStatus, loadAll]);
 
   const selected = useMemo(
     () => peers.find((p) => p.id === selectedId) ?? null,
     [peers, selectedId],
   );
-
   const summaryMap = useMemo(() => latestSummaries(summaries), [summaries]);
   const selectedSummary = selected ? summaryFor(summaryMap, selected) : undefined;
-
   const peerActivity = useMemo(() => {
     if (!selected) return [];
     return activity.filter(
@@ -208,7 +169,6 @@ function CompetitorMonitor() {
         a.competitor_name.toLowerCase() === selected.name.toLowerCase(),
     );
   }, [activity, selected]);
-
   const weeks = useMemo(() => groupActivityByWeek(peerActivity), [peerActivity]);
   const activityState = summarizeActivity(peerActivity, runStatus);
 
@@ -237,11 +197,9 @@ function CompetitorMonitor() {
       } else if (!res.ok) {
         setRefreshMsg(body.error ?? `Refresh failed (${res.status})`);
       } else {
-        setRefreshMsg(
-          `Updated ${body.updated ?? 0}, skipped ${body.skipped ?? 0}.`,
-        );
+        setRefreshMsg(`Updated ${body.updated ?? 0}, skipped ${body.skipped ?? 0}.`);
       }
-      await loadActivity();
+      await loadAll();
     } catch (e) {
       setRefreshMsg(e instanceof Error ? e.message : "Refresh failed");
     } finally {
@@ -296,9 +254,7 @@ function CompetitorMonitor() {
                     Back to monitors
                   </Link>
                 </Button>
-                <h1 className="text-3xl tracking-tight md:text-4xl">
-                  Competitor monitor
-                </h1>
+                <h1 className="text-3xl tracking-tight md:text-4xl">Competitor monitor</h1>
                 <p className="mt-1 text-muted-foreground">
                   Weekly public activity for peers matched to your profile.
                 </p>
@@ -306,17 +262,13 @@ function CompetitorMonitor() {
               <Button
                 size="sm"
                 variant="secondary"
-                disabled={refreshing || runStatus === "running"}
+                disabled={refreshing || runStatus === "running" || !premium}
                 onClick={() => void refreshActivity()}
               >
-                {refreshing || runStatus === "running"
-                  ? "Refreshing…"
-                  : "Refresh activity"}
+                {refreshing || runStatus === "running" ? "Refreshing…" : "Refresh activity"}
               </Button>
             </div>
-            {refreshMsg && (
-              <p className="text-xs text-muted-foreground">{refreshMsg}</p>
-            )}
+            {refreshMsg && <p className="text-xs text-muted-foreground">{refreshMsg}</p>}
 
             {loading ? (
               <p className="rounded-2xl border border-border/60 bg-card p-5 text-sm text-muted-foreground">
@@ -357,17 +309,14 @@ function CompetitorMonitor() {
                           }`}
                         >
                           <div className="flex items-baseline justify-between gap-2">
-                            <span className="truncate text-sm font-medium">
-                              {peer.name}
-                            </span>
+                            <span className="truncate text-sm font-medium">{peer.name}</span>
                             <span className="shrink-0 text-xs uppercase tracking-wide text-muted-foreground">
                               #{peer.rank ?? index + 1}
                             </span>
                           </div>
                           <p className="mt-1 truncate text-xs text-muted-foreground">
-                            {[peer.scale, peer.sales_estimate]
-                              .filter(Boolean)
-                              .join(" · ") || "Peer in your band"}
+                            {[peer.scale, peer.sales_estimate].filter(Boolean).join(" · ") ||
+                              "Peer in your band"}
                           </p>
                           {peer.company_url && (
                             <p className="mt-1 truncate text-xs text-muted-foreground">
@@ -383,7 +332,6 @@ function CompetitorMonitor() {
                 {selected && (
                   <section className="rounded-2xl border border-border/60 bg-card p-6">
                     <h2 className="text-2xl tracking-tight">{selected.name}</h2>
-
                     <dl className="mt-4 space-y-2 text-sm">
                       <div className="flex justify-between gap-4">
                         <dt className="text-muted-foreground">Rank</dt>
@@ -415,23 +363,17 @@ function CompetitorMonitor() {
                       )}
                     </dl>
 
-                    {/* Weekly AI summary */}
                     <div className="mt-6 border-t border-border/60 pt-5">
-                      <h3 className="text-sm font-medium tracking-tight">
-                        This week’s note
-                      </h3>
+                      <h3 className="text-sm font-medium tracking-tight">This week’s note</h3>
                       {activityLoading ? (
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Loading…
-                        </p>
+                        <p className="mt-2 text-sm text-muted-foreground">Loading…</p>
                       ) : selectedSummary?.summary ? (
                         <div className="mt-2 space-y-2">
                           <p className="text-sm leading-relaxed text-muted-foreground">
                             {selectedSummary.summary}
                           </p>
                           <p className="text-[10px] text-muted-foreground">
-                            Week of {selectedSummary.week_start} · AI estimate from
-                            public sources
+                            Week of {selectedSummary.week_start} · AI estimate from public sources
                           </p>
                           {selectedSummary.source_urls?.length > 0 && (
                             <ul className="space-y-1">
@@ -441,7 +383,7 @@ function CompetitorMonitor() {
                                     href={u}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-xs underline underline-offset-2 text-muted-foreground"
+                                    className="text-xs text-muted-foreground underline underline-offset-2"
                                   >
                                     {truncateUrl(u, 48)}
                                   </a>
@@ -452,59 +394,52 @@ function CompetitorMonitor() {
                         </div>
                       ) : (
                         <p className="mt-2 text-sm text-muted-foreground">
-                          No weekly note yet. Use Refresh activity after peers
-                          exist.
+                          No weekly note yet. Use Refresh activity after peers exist.
                         </p>
                       )}
                     </div>
 
-                    {/* Activity feed */}
                     <div className="mt-6 border-t border-border/60 pt-5">
-                      <h3 className="text-sm font-medium tracking-tight">
-                        Activity
-                      </h3>
+                      <h3 className="text-sm font-medium tracking-tight">Activity</h3>
                       {activityLoading || activityState.state === "fetching" ? (
                         <p className="mt-2 text-sm text-muted-foreground">
                           Fetching public activity…
                         </p>
                       ) : activityState.state === "empty" ? (
                         <p className="mt-2 text-sm text-muted-foreground">
-                          No public activity logged for this peer this week (or
-                          yet). Quiet weeks are normal for many B2B companies.
+                          No public activity logged for this peer this week (or yet). Quiet weeks
+                          are normal for many B2B companies.
                         </p>
                       ) : (
                         <div className="mt-3 space-y-6">
                           {activityState.refreshing && (
-                            <p className="text-xs text-muted-foreground">
-                              Refresh in progress…
-                            </p>
+                            <p className="text-xs text-muted-foreground">Refresh in progress…</p>
                           )}
                           {weeks.map(({ weekStart, items }) => (
                             <div key={weekStart}>
-                              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                              <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">
                                 Week of {weekStart}
                               </p>
-                              <ul className="mt-2 space-y-4">
-                                {items.map((ev) => (
-                                  <li key={ev.id} className="text-sm">
-                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                                      {ev.category}
+                              <ul className="space-y-3">
+                                {items.map((item) => (
+                                  <li
+                                    key={item.id}
+                                    className="rounded-xl border border-border/50 p-3"
+                                  >
+                                    <p className="text-sm font-medium">{item.headline}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                      {item.summary}
                                     </p>
-                                    <p className="mt-0.5 font-medium leading-snug">
-                                      {ev.headline}
-                                    </p>
-                                    <p className="mt-1 text-muted-foreground leading-relaxed">
-                                      {ev.summary}
-                                    </p>
-                                    <a
-                                      href={ev.source_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="mt-1 inline-flex items-center gap-1 text-xs underline underline-offset-2 text-muted-foreground"
-                                    >
-                                      {truncateUrl(ev.source_url, 48)}
-                                      <ExternalLink className="h-3 w-3" />
-                                    </a>
+                                    {item.source_url && (
+                                      <a
+                                        href={item.source_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="mt-2 inline-block text-xs underline underline-offset-2"
+                                      >
+                                        Source
+                                      </a>
+                                    )}
                                   </li>
                                 ))}
                               </ul>
