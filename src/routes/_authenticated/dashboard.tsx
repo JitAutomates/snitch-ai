@@ -12,9 +12,9 @@ import {
   Sparkles,
   Loader2,
 } from "lucide-react";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import { authFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { usePlan } from "@/hooks/use-plan";
 import { planDisplayAccess } from "@/lib/plan";
@@ -37,7 +37,6 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
-
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/monitors", label: "Monitors", icon: Radar },
@@ -54,96 +53,33 @@ function Dashboard() {
   const [pinned, setPinned] = useState<DailyBrief[]>([]);
   const [loadingPinned, setLoadingPinned] = useState(true);
   const [pinnedError, setPinnedError] = useState<string | null>(null);
-
-    const loadPinned = useCallback(async () => {
-    if (planLoading) return;
-    if (!premium) {
-      setPinned([]);
-      setPinnedError(null);
-      setLoadingPinned(false);
-      return;
-    }
-    setLoadingPinned(true);
-    setPinnedError(null);
-    try {
-      const { data: auth, error: authError } = await supabase.auth.getUser();
-      if (authError || !auth.user) throw new Error("Sign in to load pinned briefs.");
-      const { data, error } = await (supabase as SupabaseClient)
-        .from("briefs")
-        .select("id, user_id, day, title, body, action_plan, highlights, pinned, model, created_at")
-        .eq("user_id", auth.user.id)
-        .eq("pinned", true)
-        .order("day", { ascending: false })
-        .limit(20);
-      if (error) throw new Error("Could not load pinned briefs.");
-      setPinned(z.array(BriefRow).parse(data ?? []));
-    } catch (e) {
-      setPinnedError(e instanceof Error ? e.message : "Could not load pinned briefs.");
-      setPinned([]);
-    } finally {
-      setLoadingPinned(false);
-    }
-  }, [premium, planLoading]);
-  
   const [notables, setNotables] = useState<NotableUpdate[]>([]);
   const [loadingNotables, setLoadingNotables] = useState(true);
   const [notablesError, setNotablesError] = useState<string | null>(null);
 
-    const loadNotables = useCallback(async () => {
+  const loadDashboard = useCallback(async () => {
     if (planLoading) return;
     if (!premium) {
+      setPinned([]);
       setNotables([]);
+      setPinnedError(null);
       setNotablesError(null);
+      setLoadingPinned(false);
       setLoadingNotables(false);
       return;
     }
+    setLoadingPinned(true);
     setLoadingNotables(true);
+    setPinnedError(null);
     setNotablesError(null);
     try {
-      const { data: auth, error: authError } = await supabase.auth.getUser();
-      if (authError || !auth.user) throw new Error("Sign in to load notable updates.");
-      const uid = auth.user.id;
-      const nowIso = new Date().toISOString();
-      const db = supabase as SupabaseClient;
-
-      const [newsRes, actRes, priceRes] = await Promise.all([
-        db
-          .from("niche_news")
-          .select("id, headline, body, day, severe, severe_until, source_urls")
-          .eq("user_id", uid)
-          .eq("severe", true)
-          .gt("severe_until", nowIso)
-          .order("day", { ascending: false })
-          .limit(15),
-        db
-          .from("competitor_activity")
-          .select(
-            "id, headline, summary, category, competitor_name, created_at, published_at, severe, severe_until, source_url",
-          )
-          .eq("user_id", uid)
-          .eq("severe", true)
-          .gt("severe_until", nowIso)
-          .order("created_at", { ascending: false })
-          .limit(15),
-        db
-          .from("peer_prices")
-          .select(
-            "id, competitor_name, amount, amount_display, currency, plan_label, observed_at, severe, severe_until, source_url, notes",
-          )
-          .eq("user_id", uid)
-          .eq("severe", true)
-          .gt("severe_until", nowIso)
-          .order("observed_at", { ascending: false })
-          .limit(15),
-      ]);
-
-      if (newsRes.error || actRes.error || priceRes.error) {
-        throw new Error("Could not load notable updates. Confirm severe columns exist.");
-      }
+      const data = await authFetch("/api/data/dashboard");
+      setPinned(z.array(BriefRow).parse(data.pinned ?? []));
 
       const items: NotableUpdate[] = [];
+      const bag = data.notables ?? { news: [], activity: [], prices: [] };
 
-      for (const row of newsRes.data ?? []) {
+      for (const row of bag.news ?? []) {
         const r = row as {
           id: string;
           headline: string;
@@ -162,8 +98,7 @@ function Dashboard() {
           href: "/monitors",
         });
       }
-
-      for (const row of actRes.data ?? []) {
+      for (const row of bag.activity ?? []) {
         const r = row as {
           id: string;
           headline: string;
@@ -186,8 +121,7 @@ function Dashboard() {
           sourceUrl: r.source_url,
         });
       }
-
-      for (const row of priceRes.data ?? []) {
+      for (const row of bag.prices ?? []) {
         const r = row as {
           id: string;
           competitor_name: string;
@@ -215,26 +149,23 @@ function Dashboard() {
           sourceUrl: r.source_url,
         });
       }
-
       items.sort((a, b) => b.whenIso.localeCompare(a.whenIso));
       setNotables(items.slice(0, 20));
     } catch (e) {
-      setNotablesError(e instanceof Error ? e.message : "Could not load notables.");
+      const msg = e instanceof Error ? e.message : "Could not load dashboard.";
+      setPinnedError(msg);
+      setNotablesError(msg);
+      setPinned([]);
       setNotables([]);
     } finally {
+      setLoadingPinned(false);
       setLoadingNotables(false);
     }
   }, [premium, planLoading]);
 
-      
-
   useEffect(() => {
-    void loadNotables();
-  }, [loadNotables]);
-
-  useEffect(() => {
-    void loadPinned();
-  }, [loadPinned]);
+    void loadDashboard();
+  }, [loadDashboard]);
 
   async function signOut() {
     await queryClient.cancelQueries();
@@ -310,7 +241,7 @@ function Dashboard() {
                     <p role="alert" className="text-sm text-destructive">
                       {pinnedError}
                     </p>
-                    <Button variant="secondary" size="sm" onClick={() => void loadPinned()}>
+                    <Button variant="secondary" size="sm" onClick={() => void loadDashboard()}>
                       Retry
                     </Button>
                   </div>
@@ -348,7 +279,7 @@ function Dashboard() {
               </PlanBlur>
             </section>
 
-                        <section>
+            <section>
               <div className="mb-4 flex items-center gap-2">
                 <Bell className="h-4 w-4 text-muted-foreground" />
                 <h2 className="text-lg tracking-tight">Notable updates</h2>
@@ -363,14 +294,14 @@ function Dashboard() {
                   <p role="alert" className="text-sm text-destructive">
                     {notablesError}
                   </p>
-                  <Button variant="secondary" size="sm" onClick={() => void loadNotables()}>
+                  <Button variant="secondary" size="sm" onClick={() => void loadDashboard()}>
                     Retry
                   </Button>
                 </div>
               ) : notables.length === 0 ? (
                 <p className="rounded-2xl bg-card p-6 text-sm text-muted-foreground">
-                  No severe updates in the last week. High-impact news, competitor moves, and
-                  large pricing changes will appear here for 7 days.
+                  No severe updates in the last week. High-impact news, competitor moves, and large
+                  pricing changes will appear here for 7 days.
                 </p>
               ) : (
                 <ul className="space-y-3">
