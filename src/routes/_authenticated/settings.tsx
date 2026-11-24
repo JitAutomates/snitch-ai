@@ -1,27 +1,68 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type FormEvent } from "react";
-import { LayoutDashboard, Radar, FileText, CreditCard, Settings as SettingsIcon, Loader2, Trash2 } from "lucide-react";
+import {
+  LayoutDashboard,
+  Radar,
+  FileText,
+  CreditCard,
+  Settings as SettingsIcon,
+  Loader2,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { authFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { COUNTRIES } from "@/lib/settings-countries";
 import { usePlan } from "@/hooks/use-plan";
-import { APPEARANCE_KEY, DEFAULT_APPEARANCE, applyAppearance, canConfirmAccountAction, loadAppearance, peerFieldsChanged, profileFromMetadata, type Appearance, type ProfileFields } from "@/lib/settings";
+import {
+  APPEARANCE_KEY,
+  DEFAULT_APPEARANCE,
+  applyAppearance,
+  canConfirmAccountAction,
+  loadAppearance,
+  peerFieldsChanged,
+  profileFromMetadata,
+  type Appearance,
+  type ProfileFields,
+} from "@/lib/settings";
 
 export const Route = createFileRoute("/_authenticated/settings")({
-  head: () => ({ meta: [
-    { title: "Settings | Snitch" },
-    { name: "description", content: "Manage your Snitch company profile, appearance, plan and account." },
-    { property: "og:title", content: "Settings | Snitch" },
-    { property: "og:description", content: "Manage your Snitch company profile, appearance, plan and account." },
-    { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" },
-  ] }),
+  head: () => ({
+    meta: [
+      { title: "Settings | Snitch" },
+      {
+        name: "description",
+        content: "Manage your Snitch company profile, appearance, plan and account.",
+      },
+      { property: "og:title", content: "Settings | Snitch" },
+      {
+        property: "og:description",
+        content: "Manage your Snitch company profile, appearance, plan and account.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
   component: SettingsPage,
 });
 
@@ -54,60 +95,98 @@ function SettingsPage() {
     let cancelled = false;
     async function load() {
       try {
-        const { data, error } = await supabase.auth.getUser();
-        if (error || !data.user) throw error ?? new Error("Please sign in again.");
-        const { data: profile, error: profileError } = await supabase.from("profiles").select("display_name, industry, product, region, scale, sales_volume").eq("id", data.user.id).single();
-        if (profileError) throw profileError;
-        const values = profileFromMetadata(profile);
-        if (!cancelled) { setFields(values); setOriginal(values); }
+        const data = await authFetch("/api/me/profile");
+        const values = profileFromMetadata(data.profile ?? {});
+        if (!cancelled) {
+          setFields(values);
+          setOriginal(values);
+          setLoadError(false);
+        }
       } catch {
-        if (!cancelled) { setLoadError(true); toast.error("Could not load your profile. Please reload and try again."); }
-      } finally { if (!cancelled) setLoading(false); }
+        if (!cancelled) {
+          setLoadError(true);
+          toast.error("Could not load your profile. Please reload and try again.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
     void load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  function changeField(key: keyof ProfileFields, value: string) { setFields((previous) => ({ ...previous, [key]: value })); }
+  function changeField(key: keyof ProfileFields, value: string) {
+    setFields((previous) => ({ ...previous, [key]: value }));
+  }
+
   function changeAppearance(value: Appearance) {
     setAppearance(value);
     applyAppearance(value);
-    try { localStorage.setItem(APPEARANCE_KEY, JSON.stringify(value)); }
-    catch { toast.error("Appearance applied, but this browser could not save your preferences."); }
+    try {
+      localStorage.setItem(APPEARANCE_KEY, JSON.stringify(value));
+    } catch {
+      toast.error("Appearance applied, but this browser could not save your preferences.");
+    }
   }
 
   async function saveProfile(event: FormEvent) {
     event.preventDefault();
-    const values = { ...fields, display_name: fields.display_name.trim(), industry: fields.industry.trim(), product: fields.product.trim() };
+    const values = {
+      ...fields,
+      display_name: fields.display_name.trim(),
+      industry: fields.industry.trim(),
+      product: fields.product.trim(),
+    };
     const sales = Number(values.sales_volume);
-    if (!values.industry || !values.product || !values.region || !values.scale || !values.sales_volume || !Number.isFinite(sales) || sales < 0) {
-      toast.error("Complete your company details and enter a valid annual sales volume."); return;
+    if (
+      !values.industry ||
+      !values.product ||
+      !values.region ||
+      !values.scale ||
+      !values.sales_volume ||
+      !Number.isFinite(sales) ||
+      sales < 0
+    ) {
+      toast.error("Complete your company details and enter a valid annual sales volume.");
+      return;
     }
     setSaving(true);
     try {
       const refreshPeers = peerFieldsChanged(original, values);
-      const { data, error } = await supabase.auth.getUser();
-      if (error || !data.user) throw error ?? new Error("Could not save your profile.");
-      const { error: profileError } = await supabase.from("profiles").update({ ...values, display_name: values.display_name || null, sales_volume: sales }).eq("id", data.user.id);
-      if (profileError) throw new Error(profileError.code === "P0001" ? profileError.message : "Could not save your profile.");
-      setOriginal(values); setFields(values);
+      await authFetch("/api/me/profile", {
+        method: "PATCH",
+        body: JSON.stringify({
+          display_name: values.display_name || null,
+          industry: values.industry,
+          product: values.product,
+          region: values.region,
+          scale: values.scale,
+          sales_volume: sales,
+        }),
+      });
+      setOriginal(values);
+      setFields(values);
       toast.success("Profile saved.");
       if (refreshPeers) {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData.session?.access_token;
-        if (token) {
-          void fetch("/api/peers/resolve", {
-            method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        try {
+          await authFetch("/api/peers/resolve", {
+            method: "POST",
             body: JSON.stringify({ reason: "profile_change" }),
-          }).then((response) => { if (!response.ok) toast.warning("Profile saved, but competitor peers could not be refreshed."); })
-            .catch(() => toast.warning("Profile saved, but competitor peers could not be refreshed."));
-        } else toast.warning("Profile saved. Sign in again to refresh competitor peers.");
+          });
+        } catch {
+          toast.warning("Profile saved, but competitor peers could not be refreshed.");
+        }
       }
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not save your profile."); }
-    finally { setSaving(false); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save your profile.");
+    } finally {
+      setSaving(false);
+    }
   }
 
-    async function deleteAccount() {
+  async function deleteAccount() {
     if (!canConfirmAccountAction(confirmation)) return;
     setDeleting(true);
     try {
@@ -150,7 +229,8 @@ function SettingsPage() {
       setDeleting(false);
     }
   }
-    async function signOut() {
+
+  async function signOut() {
     setSigningOut(true);
     try {
       await queryClient.cancelQueries();
@@ -164,40 +244,161 @@ function SettingsPage() {
       setSigningOut(false);
     }
   }
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
         <div className="flex h-14 items-center justify-between px-5">
-          <Link to="/" className="text-xl">Snitch</Link>
-          <Button variant="secondary" size="sm" disabled={signingOut} onClick={() => void signOut()}>Sign out</Button>
+          <Link to="/" className="text-xl">
+            Snitch
+          </Link>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={signingOut}
+            onClick={() => void signOut()}
+          >
+            Sign out
+          </Button>
         </div>
       </header>
       <div className="flex flex-1">
         <aside className="hidden w-16 shrink-0 border-r md:flex md:w-52 md:flex-col">
           <nav className="flex flex-1 flex-col gap-1 p-3">
-            {NAV.map(({ to, label, icon: Icon }) => <Link key={to} to={to} activeOptions={{ exact: true }} className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground [&.active]:bg-accent [&.active]:text-foreground"><Icon className="h-4 w-4 shrink-0" /><span className="hidden md:inline">{label}</span></Link>)}
+            {NAV.map(({ to, label, icon: Icon }) => (
+              <Link
+                key={to}
+                to={to}
+                activeOptions={{ exact: true }}
+                className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground [&.active]:bg-accent [&.active]:text-foreground"
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="hidden md:inline">{label}</span>
+              </Link>
+            ))}
           </nav>
         </aside>
         <main className="min-w-0 flex-1 px-5 py-8 md:px-8">
           <div className="mx-auto max-w-3xl space-y-6">
             <h1 className="text-3xl md:text-4xl">Settings</h1>
-            <section className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6" aria-labelledby="profile-title">
-              <h2 id="profile-title" className="mb-5 text-xl text-emphasis">Profile</h2>
-              <p className="mb-5 text-sm text-muted-foreground">Profile details can be changed once every 2 weeks.</p>
-              {loading ? <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />Loading profile</p> : loadError ? <p role="alert" className="text-sm text-destructive">Could not load your profile. Please reload this page.</p> :
+            <section
+              className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6"
+              aria-labelledby="profile-title"
+            >
+              <h2 id="profile-title" className="mb-5 text-xl text-emphasis">
+                Profile
+              </h2>
+              <p className="mb-5 text-sm text-muted-foreground">
+                Profile details can be changed once every 2 weeks.
+              </p>
+              {loading ? (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+                  Loading profile
+                </p>
+              ) : loadError ? (
+                <p role="alert" className="text-sm text-destructive">
+                  Could not load your profile. Please reload this page.
+                </p>
+              ) : (
                 <form onSubmit={saveProfile} className="space-y-5">
                   <div className="grid gap-5 sm:grid-cols-2">
-                    <div className="space-y-2"><Label htmlFor="display-name">Display name (optional)</Label><Input id="display-name" value={fields.display_name} onChange={(e) => changeField("display_name", e.target.value)} maxLength={120} /></div>
-                    <div className="space-y-2"><Label htmlFor="industry">Industry</Label><Input id="industry" value={fields.industry} onChange={(e) => changeField("industry", e.target.value)} maxLength={120} required /></div>
-                    <div className="space-y-2 sm:col-span-2"><Label htmlFor="product">Main product/service</Label><Input id="product" value={fields.product} onChange={(e) => changeField("product", e.target.value)} maxLength={200} required /></div>
-                    <div className="space-y-2"><Label htmlFor="region">Region</Label><Select value={fields.region} onValueChange={(value) => changeField("region", value)} required><SelectTrigger id="region" className="w-full"><SelectValue placeholder="Select a country" /></SelectTrigger><SelectContent className="max-h-72">{COUNTRIES.map((country) => <SelectItem key={country} value={country}>{country}</SelectItem>)}</SelectContent></Select></div>
-                    <div className="space-y-2"><Label htmlFor="scale">Company scale</Label><Select value={fields.scale} onValueChange={(value) => changeField("scale", value)} required><SelectTrigger id="scale" className="w-full"><SelectValue placeholder="Select company scale" /></SelectTrigger><SelectContent><SelectItem value="indie">Indie (solo)</SelectItem><SelectItem value="small">Small team (under 12)</SelectItem><SelectItem value="large">Large team (12+)</SelectItem></SelectContent></Select></div>
-                    <div className="space-y-2 sm:col-span-2"><Label htmlFor="sales">Annual sales volume HKD</Label><Input id="sales" type="number" min="0" step="any" inputMode="decimal" value={fields.sales_volume} onChange={(e) => changeField("sales_volume", e.target.value)} required /><p className="text-xs text-muted-foreground">Peers are matched roughly from half to double this figure.</p></div>
+                    <div className="space-y-2">
+                      <Label htmlFor="display-name">Display name (optional)</Label>
+                      <Input
+                        id="display-name"
+                        value={fields.display_name}
+                        onChange={(e) => changeField("display_name", e.target.value)}
+                        maxLength={120}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="industry">Industry</Label>
+                      <Input
+                        id="industry"
+                        value={fields.industry}
+                        onChange={(e) => changeField("industry", e.target.value)}
+                        maxLength={120}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="product">Main product/service</Label>
+                      <Input
+                        id="product"
+                        value={fields.product}
+                        onChange={(e) => changeField("product", e.target.value)}
+                        maxLength={200}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="region">Region</Label>
+                      <Select
+                        value={fields.region}
+                        onValueChange={(value) => changeField("region", value)}
+                        required
+                      >
+                        <SelectTrigger id="region" className="w-full">
+                          <SelectValue placeholder="Select a country" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-72">
+                          {COUNTRIES.map((country) => (
+                            <SelectItem key={country} value={country}>
+                              {country}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="scale">Company scale</Label>
+                      <Select
+                        value={fields.scale}
+                        onValueChange={(value) => changeField("scale", value)}
+                        required
+                      >
+                        <SelectTrigger id="scale" className="w-full">
+                          <SelectValue placeholder="Select company scale" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="indie">Indie (solo)</SelectItem>
+                          <SelectItem value="small">Small team (under 12)</SelectItem>
+                          <SelectItem value="large">Large team (12+)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="sales">Annual sales volume HKD</Label>
+                      <Input
+                        id="sales"
+                        type="number"
+                        min="0"
+                        step="any"
+                        inputMode="decimal"
+                        value={fields.sales_volume}
+                        onChange={(e) => changeField("sales_volume", e.target.value)}
+                        required
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Peers are matched roughly from half to double this figure.
+                      </p>
+                    </div>
                   </div>
-                  <Button type="submit" size="pill" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" />}{saving ? "Saving" : "Save profile"}</Button>
-                </form>}
+                  <Button type="submit" size="pill" disabled={saving}>
+                    {saving && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" />
+                    )}
+                    {saving ? "Saving" : "Save profile"}
+                  </Button>
+                </form>
+              )}
             </section>
-                        <section className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6" aria-labelledby="subscription-title">
+
+            <section
+              className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6"
+              aria-labelledby="subscription-title"
+            >
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <h2 id="subscription-title" className="text-xl text-emphasis">
@@ -225,16 +426,67 @@ function SettingsPage() {
                 </Button>
               </div>
             </section>
-            <section className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6" aria-labelledby="appearance-title">
-              <h2 id="appearance-title" className="mb-5 text-xl text-emphasis">Appearance</h2>
+
+            <section
+              className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6"
+              aria-labelledby="appearance-title"
+            >
+              <h2 id="appearance-title" className="mb-5 text-xl text-emphasis">
+                Appearance
+              </h2>
               <div className="space-y-5">
-                <div className="flex flex-wrap items-center justify-between gap-3"><Label>Theme</Label><div className="flex gap-1" role="group" aria-label="Theme">{(["dark", "light"] as const).map((theme) => <Button key={theme} variant={appearance.theme === theme ? "default" : "secondary"} size="sm" aria-pressed={appearance.theme === theme} onClick={() => changeAppearance({ ...appearance, theme })}>{theme === "dark" ? "Dark" : "Light"}</Button>)}</div></div>
-                <div className="flex flex-wrap items-center justify-between gap-3"><Label>Font size</Label><div className="flex gap-1" role="group" aria-label="Font size">{(["small", "medium", "large"] as const).map((fontSize) => <Button key={fontSize} variant={appearance.fontSize === fontSize ? "default" : "secondary"} size="sm" aria-pressed={appearance.fontSize === fontSize} onClick={() => changeAppearance({ ...appearance, fontSize })}>{fontSize.charAt(0).toUpperCase() + fontSize.slice(1)}</Button>)}</div></div>
-                <div className="flex items-center justify-between gap-3"><Label htmlFor="emphasis">Coloured emphasis</Label><Switch id="emphasis" checked={appearance.colouredEmphasis} onCheckedChange={(colouredEmphasis) => changeAppearance({ ...appearance, colouredEmphasis })} /></div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <Label>Theme</Label>
+                  <div className="flex gap-1" role="group" aria-label="Theme">
+                    {(["dark", "light"] as const).map((theme) => (
+                      <Button
+                        key={theme}
+                        variant={appearance.theme === theme ? "default" : "secondary"}
+                        size="sm"
+                        aria-pressed={appearance.theme === theme}
+                        onClick={() => changeAppearance({ ...appearance, theme })}
+                      >
+                        {theme === "dark" ? "Dark" : "Light"}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <Label>Font size</Label>
+                  <div className="flex gap-1" role="group" aria-label="Font size">
+                    {(["small", "medium", "large"] as const).map((fontSize) => (
+                      <Button
+                        key={fontSize}
+                        variant={appearance.fontSize === fontSize ? "default" : "secondary"}
+                        size="sm"
+                        aria-pressed={appearance.fontSize === fontSize}
+                        onClick={() => changeAppearance({ ...appearance, fontSize })}
+                      >
+                        {fontSize.charAt(0).toUpperCase() + fontSize.slice(1)}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="emphasis">Coloured emphasis</Label>
+                  <Switch
+                    id="emphasis"
+                    checked={appearance.colouredEmphasis}
+                    onCheckedChange={(colouredEmphasis) =>
+                      changeAppearance({ ...appearance, colouredEmphasis })
+                    }
+                  />
+                </div>
               </div>
             </section>
-                                    <section className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6" aria-labelledby="account-title">
-              <h2 id="account-title" className="text-xl text-emphasis">Data &amp; account</h2>
+
+            <section
+              className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6"
+              aria-labelledby="account-title"
+            >
+              <h2 id="account-title" className="text-xl text-emphasis">
+                Data &amp; account
+              </h2>
               <div className="mt-5">
                 <Button
                   variant="destructive"
@@ -249,10 +501,12 @@ function SettingsPage() {
               </div>
               <p className="mt-4 text-sm text-muted-foreground">
                 Deleting your account permanently removes your profile, monitors data, briefs, and
-                sign-in. Active Stripe subscriptions are cancelled when possible. This cannot be undone.
+                sign-in. Active Stripe subscriptions are cancelled when possible. This cannot be
+                undone.
               </p>
             </section>
-                        <section className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6">
+
+            <section className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6">
               <h2 className="text-xl text-emphasis">Legal</h2>
               <p className="mt-3 text-sm text-muted-foreground">
                 <Link
@@ -261,6 +515,7 @@ function SettingsPage() {
                 >
                   Terms and Conditions
                 </Link>
+                {" · "}
                 <Link
                   to={"/privacy" as never}
                   className="text-foreground underline-offset-4 hover:underline"
@@ -269,11 +524,15 @@ function SettingsPage() {
                 </Link>
               </p>
             </section>
-            <p className="text-xs text-muted-foreground">Changes to industry, product, region, scale or sales may refresh competitor peers (up to 10) via the existing peer resolver.</p>
+            <p className="text-xs text-muted-foreground">
+              Changes to industry, product, region, scale or sales may refresh competitor peers (up
+              to 10) via the existing peer resolver.
+            </p>
           </div>
         </main>
       </div>
-            <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete account</DialogTitle>
