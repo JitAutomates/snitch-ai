@@ -183,7 +183,7 @@ function Briefs() {
       setGenerating(false);
     }
   }
-
+  
   async function togglePin() {
     if (!active) return;
     if (!access.canPinBrief) {
@@ -194,20 +194,39 @@ function Briefs() {
     setPinning(true);
     setActionError(null);
     try {
-      const { data, error } = await (supabase as SupabaseClient)
-        .from("briefs")
-        .update({ pinned: !active.pinned })
-        .eq("id", active.id)
-        .eq("user_id", active.user_id)
-        .select("id, pinned")
-        .single();
-      if (error) throw new Error("Could not save your pin. Please try again.");
-      const saved = z.object({ id: z.string(), pinned: z.boolean() }).parse(data);
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("Sign in to pin briefs.");
+      }
+      const response = await fetch("/api/briefs/pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+        body: JSON.stringify({
+          id: active.id,
+          pinned: !active.pinned,
+        }),
+      });
+      const payload = await response.json().catch(() => ({} as Record<string, unknown>));
+      if (!response.ok) {
+        throw new Error(
+          typeof payload.error === "string" && payload.error.length > 0
+            ? payload.error
+            : "Could not save your pin. Please try again.",
+        );
+      }
+      const saved = z
+        .object({ id: z.string(), pinned: z.boolean() })
+        .parse(payload);
       setHistory((h) =>
         h.map((b) => (b.id === saved.id ? { ...b, pinned: saved.pinned } : b)),
       );
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Could not save your pin.");
+      setActionError(
+        error instanceof Error ? error.message : "Could not save your pin.",
+      );
     } finally {
       setPinning(false);
     }
