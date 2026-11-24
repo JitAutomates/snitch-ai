@@ -15,6 +15,7 @@ import {
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import { authFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { usePlan } from "@/hooks/use-plan";
@@ -97,45 +98,23 @@ function Briefs() {
   );
   const sources = active ? briefSources(active.highlights) : [];
 
-  const loadBriefs = useCallback(async () => {
+    const loadBriefs = useCallback(async () => {
     if (planLoading) return false;
     setLoading(true);
     setLoadError(null);
     try {
-      const { data: auth, error: authError } = await supabase.auth.getUser();
-      if (authError || !auth.user) throw new Error("Sign in to load your briefs.");
-
-      let query = (supabase as SupabaseClient)
-        .from("briefs")
-        .select(
-          "id, user_id, day, title, body, action_plan, highlights, pinned, model, created_at",
-        )
-        .eq("user_id", auth.user.id)
-        .order("day", { ascending: false });
-
-      if (!premium) {
-        // Free: today only — no history payload to inspect
-        query = query.eq("day", utcBriefDay()).limit(1);
-      } else {
-        const since = utcBriefDay(new Date(Date.now() - 59 * 86400000));
-        query = query.gte("day", since).lte("day", utcBriefDay()).limit(60);
-      }
-
-      const { data, error } = await query;
-      if (error) {
-        throw new Error(
-          "Could not load briefs. Check that the briefs table has been set up, then retry.",
-        );
-      }
-      setHistory(z.array(BriefRow).parse(data ?? []));
+      const data = await authFetch("/api/briefs/list");
+      setHistory(z.array(BriefRow).parse(data.briefs ?? []));
       return true;
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "Could not load briefs.");
+      setLoadError(
+        error instanceof Error ? error.message : "Could not load briefs.",
+      );
       return false;
     } finally {
       setLoading(false);
     }
-  }, [premium, planLoading]);
+  }, [planLoading]);
 
   useEffect(() => {
     void loadBriefs();
