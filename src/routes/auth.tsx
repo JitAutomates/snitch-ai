@@ -81,6 +81,7 @@ function AuthPage() {
         (profile?.industry && profile?.product && profile?.region && profile?.scale)
       );
         await navigate({ to: done ? "/dashboard" : "/onboarding", replace: true });
+    };
 
     void routeUser();
 
