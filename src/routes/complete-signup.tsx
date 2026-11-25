@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { authFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,11 +20,14 @@ export const Route = createFileRoute("/complete-signup")({
 });
 
 function isAdult(iso: string): boolean {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return false;
+  const parts = iso.split("-").map((p) => Number(p));
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return false;
+  const [y, m, d] = parts as [number, number, number];
+  const birth = new Date(y, m - 1, d, 12, 0, 0, 0);
   const cutoff = new Date();
+  cutoff.setHours(12, 0, 0, 0);
   cutoff.setFullYear(cutoff.getFullYear() - 18);
-  return d <= cutoff;
+  return birth.getTime() <= cutoff.getTime();
 }
 
 function CompleteSignupPage() {
@@ -42,20 +46,28 @@ function CompleteSignupPage() {
         await navigate({ to: "/auth", replace: true });
         return;
       }
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("is_adult, industry, product, region, scale")
-        .eq("id", data.user.id)
-        .maybeSingle();
-      if (cancelled) return;
-      if (profile?.is_adult === true) {
-        const done = Boolean(
-          profile.industry && profile.product && profile.region && profile.scale,
-        );
-        await navigate({ to: done ? "/dashboard" : "/onboarding", replace: true });
-        return;
+      try {
+        // Service-role API — do not query profiles from the browser
+        const payload = await authFetch("/api/me/profile");
+        if (cancelled) return;
+        const profile = payload.profile as {
+          is_adult?: boolean;
+          industry?: string | null;
+          product?: string | null;
+          region?: string | null;
+          scale?: string | null;
+        } | null;
+        if (profile?.is_adult === true) {
+          const done = Boolean(
+            profile.industry && profile.product && profile.region && profile.scale,
+          );
+          await navigate({ to: done ? "/dashboard" : "/onboarding", replace: true });
+          return;
+        }
+      } catch {
+        // No profile / not adult yet → show form
       }
-      setReady(true);
+      if (!cancelled) setReady(true);
     })();
     return () => {
       cancelled = true;
@@ -69,7 +81,7 @@ function CompleteSignupPage() {
       setError("Please accept the terms and privacy policy.");
       return;
     }
-    if (!isAdult(birthDate)) {
+    if (!birthDate || !isAdult(birthDate)) {
       setError("You must be 18 or older to use Snitch.");
       return;
     }
@@ -128,7 +140,7 @@ function CompleteSignupPage() {
       <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 rounded-2xl bg-card p-8">
         <h1 className="text-3xl">One more step</h1>
         <p className="text-sm text-muted-foreground">
-          Google does not share your date of birth. Confirm you are 18 or older to continue.
+          Confirm you are 18 or older to continue. We only keep a yes or no, not your birth date.
         </p>
         <div className="space-y-2">
           <Label htmlFor="dob">Date of birth</Label>
@@ -139,9 +151,6 @@ function CompleteSignupPage() {
             value={birthDate}
             onChange={(e) => setBirthDate(e.target.value)}
           />
-          <p className="text-xs text-muted-foreground">
-            We only keep a yes or no, not your birth date.
-          </p>
         </div>
         <label className="flex items-start gap-3 text-sm text-muted-foreground">
           <Checkbox
