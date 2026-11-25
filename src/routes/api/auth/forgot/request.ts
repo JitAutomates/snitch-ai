@@ -6,8 +6,11 @@ const Body = z.object({ email: z.string().email().max(320) }).strict();
 const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
+/** Same body for unknown email, success, and in-cooldown — no enumeration. */
 const GENERIC =
   "If an account exists for that email, a 6-letter code is on its way. You can request another after 90 seconds.";
+
+const OK = { ok: true as const, message: GENERIC, cooldownSec: 90 };
 
 async function post({ request }: { request: Request }) {
   try {
@@ -29,9 +32,9 @@ async function post({ request }: { request: Request }) {
     const email = normalizeEmail(parsed.data.email);
     const userId = await findAuthUserIdByEmail(db, email);
 
-    // Always respond generically; only send if user exists
+    // Unknown email: identical response, no mail
     if (!userId) {
-      return json({ ok: true, message: GENERIC, cooldownSec: 90 });
+      return json(OK);
     }
 
     const { data: latest } = await db
@@ -43,14 +46,11 @@ async function post({ request }: { request: Request }) {
       .limit(1)
       .maybeSingle();
 
+    // In cooldown: still identical 200 — do not send, do not expose wait seconds
     if (latest?.last_sent_at) {
       const elapsed = Date.now() - new Date(latest.last_sent_at as string).getTime();
       if (elapsed < RESEND_COOLDOWN_MS) {
-        const wait = Math.ceil((RESEND_COOLDOWN_MS - elapsed) / 1000);
-        return json(
-          { error: `Please wait ${wait}s before requesting another code.`, cooldownSec: wait },
-          429,
-        );
+        return json(OK);
       }
     }
 
@@ -68,9 +68,10 @@ async function post({ request }: { request: Request }) {
 
     await sendResetCodeEmail(email, code);
 
-    return json({ ok: true, message: GENERIC, cooldownSec: 90 });
+    return json(OK);
   } catch (e) {
     console.error("[forgot/request]", e);
+    // Keep failures generic too
     return json({ error: "Could not start password reset. Try again later." }, 502);
   }
 }
