@@ -61,30 +61,25 @@ function AuthPage() {
     let cancelled = false;
 
     async function routeUser() {
-      const { data } = await supabase.auth.getUser();
-      const user = data.user;
-      if (!user || cancelled) return;
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("is_adult, industry, product, region, scale, onboarded")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (cancelled) return;
-
-      // Google (and any user) without adult attestation
+      const payload = await authFetch("/api/me/profile");
+      const profile = payload.profile as {
+        is_adult?: boolean;
+        industry?: string | null;
+        product?: string | null;
+        region?: string | null;
+        scale?: string | null;
+        onboarded?: boolean
+      } | null;
+      
       if (profile?.is_adult !== true && user.user_metadata?.["is_adult"] !== true) {
         await navigate({ to: "/complete-signup", replace: true });
         return;
       }
-
       const done = Boolean(
         profile?.onboarded ||
-          (profile?.industry && profile?.product && profile?.region && profile?.scale),
+        (profile?.industry && profile?.product && profile?.region && profile?.scale)
       );
-      await navigate({ to: done ? "/dashboard" : "/onboarding", replace: true });
-    }
+        await navigate({ to: done ? "/dashboard" : "/onboarding", replace: true });
 
     void routeUser();
 
